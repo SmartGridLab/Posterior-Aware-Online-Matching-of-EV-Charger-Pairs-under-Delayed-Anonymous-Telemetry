@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+title: "Posterior-Aware Online Matching of EV-Charger Pairs (IEEE Access reproducibility archive, v2.1)"
+message: "If you use this code, please cite the associated paper."
+type: software
+version: "2.1"
+date-released: "2026-06-29"
+authors:
+  - family-names: Yang
+    given-names: Jiseok
+    email: s2520923@u.tsukuba.ac.jp
+    affiliation: "University of Tsukuba"
+  - family-names: Kodaira
+    given-names: Daisuke
+    email: kodaira.daisuke.gf@u.tsukuba.ac.jp
+    affiliation: "University of Tsukuba"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Yang
+      given-names: Jiseok
+    - family-names: Kodaira
+      given-names: Daisuke
+  title: "Posterior-Aware Online Matching of EV-Charger Pairs under Delayed Anonymous Telemetry"
+  journal: "IEEE Access"
+  year: 2026
+  notes: "Under review."
+repository-code: "https://github.com/SmartGridLab/Posterior-Aware-Online-Matching-of-EV-Charger-Pairs-under-Delayed-Anonymous-Telemetry"
+url: "https://github.com/SmartGridLab/Posterior-Aware-Online-Matching-of-EV-Charger-Pairs-under-Delayed-Anonymous-Telemetry"
+license: MIT

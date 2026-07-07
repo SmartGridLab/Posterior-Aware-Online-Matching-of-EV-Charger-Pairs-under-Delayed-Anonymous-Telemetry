@@ -1,0 +1,17 @@
+%% algorithmic.sty — minimal stub for sandbox compilation.
+%% The IEEE Access template unconditionally requests this package; our document
+%% does not actually use the `algorithmic` environment (Algorithm 1 uses
+%% `enumerate`), so a no-op shim is sufficient here.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{algorithmic}[2026/04/17 v0.0 no-op shim for sandbox]
+\newenvironment{algorithmic}[1][0]{\begin{list}{}{}}{\end{list}}
+\providecommand{\STATE}{\item\relax}
+\providecommand{\IF}[1]{\item \textbf{if} #1 \textbf{then}}
+\providecommand{\ELSE}{\item \textbf{else}}
+\providecommand{\ENDIF}{\item \textbf{end if}}
+\providecommand{\FOR}[1]{\item \textbf{for} #1 \textbf{do}}
+\providecommand{\ENDFOR}{\item \textbf{end for}}
+\providecommand{\WHILE}[1]{\item \textbf{while} #1 \textbf{do}}
+\providecommand{\ENDWHILE}{\item \textbf{end while}}
+\providecommand{\RETURN}{\item \textbf{return}}
+\endinput

@@ -1,0 +1,39 @@
+.DS_Store
+._*
+__pycache__/
+*.py[cod]
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+logs/
+*.log
+
+# LaTeX build byproducts
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.synctex.gz
+paper/Posterior-Aware_Online_Matching_of_EV-Charger_Pairs_under_Delayed_Anonymous_Telemetry_source.pdf
+paper/*_baseline.tex
+paper/*_backup.pdf
+paper/*_preresize_backup.pdf
+paper/*_sansserif_backup.pdf
+paper/generated_figure_previews/
+paper/figure3_base_load_comparison.png
+paper/figure4_sampling_sensitivity.png
+paper/figure5_posterior_diagnostic.png
+paper/figure6_ablation_summary.png
+diagnostic_signal_realism_overlay.pdf
+diagnostic_signal_realism_overlay.png
+
+# New experiment outputs are generated locally by default.
+# Canonical submitted data is kept under case_study/scalability_analysis/accuracy/.
+.generated/
+plots/
