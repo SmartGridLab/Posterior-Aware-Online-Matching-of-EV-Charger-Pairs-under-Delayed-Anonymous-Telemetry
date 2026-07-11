@@ -1,7 +1,7 @@
 {
-  "config_hash": "7519e64bff0716c8133dd9b82ddd5d5f9c39c5cd8c2a0fc181c493edbd8cafe2",
-  "run_id": "20260704_201609_736039",
-  "run_started": "2026-07-04 20:16:09",
+  "config_hash": "bae7bf40726b12938559777771e8ab509aaf37f9f9bad6244622d6e70161ad2e",
+  "run_id": "20260711_164832_170489",
+  "run_started": "2026-07-11 16:48:32",
   "runtime_matching": {
     "evaluation_interval_s": 5,
     "min_shared_points": 4,
@@ -25,13 +25,9 @@
     "refined_mean_weight": 0.0,
     "time_prior_alpha": 1.0,
     "current_like_beta": 1.0,
-    "confidence_threshold": 0.95,
-    "stability_required": 2,
     "posterior_eps": 1e-09,
-    "confidence_margin": 0.05,
     "time_prior_mix": 0.35,
     "posterior_prev_power": 0.6,
-    "lock_boost": 0.15,
     "current_cost_weight": 0.15
   },
   "sensor_model": {

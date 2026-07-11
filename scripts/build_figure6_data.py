@@ -39,7 +39,7 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACCURACY_DIR = REPO_ROOT / "case_study" / "scalability_analysis" / "accuracy"
-ABLATION_RUN_ID = "20260703_185002_516173"
+ABLATION_RUN_ID = "20260711_164832_170489"
 ABLATION_RAW = ACCURACY_DIR / f"ablation_run_{ABLATION_RUN_ID}" / "raw_runs.csv"
 CANONICAL_RAW = ACCURACY_DIR / "canonical_run_20260626_170431_105970" / "raw_runs.csv"
 OUT_CSV = ACCURACY_DIR / "figure6_ablation_simulated.csv"

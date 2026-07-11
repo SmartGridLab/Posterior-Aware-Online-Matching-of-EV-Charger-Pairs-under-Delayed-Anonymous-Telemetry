@@ -35,7 +35,7 @@ from manuscript_figure_generation import (  # noqa: E402
 )
 
 PAPER_RUN_ID = "20260626_170431_105970"
-PAPER_ABLATION_RUN_ID = "20260703_185002_516173"
+PAPER_ABLATION_RUN_ID = "20260711_164832_170489"
 PAPER_ACCURACY_DIR = (
     REPO_ROOT
     / "case_study"
@@ -157,7 +157,7 @@ def verify_existing() -> int:
     ablation_ok = True
     if ablation_path.exists():
         ablation = pd.read_csv(ablation_path)
-        ablation_ok = tuple(ablation.shape) == (39, 128)
+        ablation_ok = tuple(ablation.shape) == (36, 128)
 
         def _acc(df: pd.DataFrame, algorithm_id: str, ev_count: int) -> float:
             row = _row(

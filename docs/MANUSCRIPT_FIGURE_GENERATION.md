@@ -51,7 +51,7 @@ by manuscript figure number.
 
 Figure 6 uses `case_study/scalability_analysis/accuracy/figure6_ablation_simulated.csv`,
 tabulated from the committed Section VI-C ablation reproduction run
-`case_study/scalability_analysis/accuracy/ablation_run_20260703_185002_516173/`
+`case_study/scalability_analysis/accuracy/ablation_run_20260711_164832_170489/`
 (12 variant algorithms × EV ∈ {100, 300, 500} × 20 repeats on the canonical
 base-load scenario seeds). The pipeline is:
 

@@ -25,13 +25,9 @@
     "refined_mean_weight": 0.0,
     "time_prior_alpha": 1.0,
     "current_like_beta": 1.0,
-    "confidence_threshold": 0.95,
-    "stability_required": 2,
     "posterior_eps": 1e-09,
-    "confidence_margin": 0.05,
     "time_prior_mix": 0.35,
     "posterior_prev_power": 0.6,
-    "lock_boost": 0.15,
     "current_cost_weight": 0.15
   },
   "sensor_model": {

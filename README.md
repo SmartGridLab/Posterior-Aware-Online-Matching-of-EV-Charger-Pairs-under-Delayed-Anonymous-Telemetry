@@ -97,7 +97,7 @@ reference repository (current generation → pair identification → case study 
 │           │   ├── report.json      #   structured run manifest (seed, config, grid)
 │           │   ├── config.json, resolved_runtime_config.json, physical_model_manifest.json
 │           │   └── git_revision.txt
-│           ├── ablation_run_20260703_185002_516173/    # Section VI-C ablation run (Figure 6)
+│           ├── ablation_run_20260711_164832_170489/    # Section VI-C ablation run (Figure 6)
 │           │   └── (same file layout as the canonical run)
 │           ├── figure6_ablation_simulated.csv          # Figure 6 data table (from the ablation run)
 │           └── README.md
@@ -271,22 +271,11 @@ base-load block) replays exactly the same scenario realizations as the canonical
 full sweep, so the full-design rows
 (`single_only`, `nomura_original_interval_hungarian`, `bayesian_windowed`) must
 reproduce the canonical `summary.csv` values. The committed run
-`case_study/scalability_analysis/accuracy/ablation_run_20260703_185002_516173/`
+`case_study/scalability_analysis/accuracy/ablation_run_20260711_164832_170489/`
 is exactly such a run and is the numerical source of manuscript Figure 6
 (tabulated by `scripts/build_figure6_data.py`, which also enforces the
 full-row-equality gate). Re-running takes a few hours single-threaded; use
 `--repeats 2` for a quick screen (means then differ from the 20-repeat figure).
-
-> **Provenance note.** The committed archived runs were produced by an earlier
-> code revision whose A3 matcher carried an optional confidence-lock stabilizer
-> that was later shown to be output-neutral and removed from the method and the
-> codebase before submission. The committed evidence run
-> `case_study/scalability_analysis/accuracy/lock_equivalence_run_20260704_201609_736039/`
-> replays the full 81-cell × 20-repeat canonical grid and proves per-run equality
-> on every reported axis (`python scripts/verify_nolock_equivalence.py`, 0/1620
-> mismatches everywhere), so the archived numbers are exactly the numbers of the
-> submitted matcher. The archived ablation run therefore contains one retired
-> variant id (`bayesian_windowed_lock_off`) that is no longer plotted.
 
 ### 5. Full Section VI reproduction
 
