@@ -231,7 +231,7 @@ def generate_figure4_sampling_sensitivity(out: Path, save_png: bool = False):
 # --------------------------------------------------------------------------- Figure 5
 # Posterior diagnostic curve for Figure 5. The six diagnostic indices are the
 # renormalized top-1/top-2 posteriors recorded at three checkpoints within each of
-# the two update stages of a single watermark decision for one representative locked
+# the two update stages of a single watermark decision for one representative
 # session at the representative operating point (EV=500). The trace is the measured
 # posterior of a canonical single-scenario replay (base_seed 2187631072); regenerate
 # it with scripts/extract_figure5_posterior_trace.py.
