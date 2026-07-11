@@ -42,7 +42,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     \address[1]{Degree Programs in Systems and Information Engineering, Graduate School of Science and Technology, University of Tsukuba, Tsukuba 305-8573, Japan}
     \address[2]{Institute of Systems and Information Engineering, University of Tsukuba, Tsukuba 305-8573, Japan}
 
-    \tfootnote{This work was supported by the Human Security Collaboration (HSC) Projects, University of Tsukuba.}
+    \tfootnote{This work was supported by the Human Security Collaboration (HSC) Projects, University of Tsukuba, and JSPS KAKENHI Grant Number JP26K01440.}
 
     \markboth
     {Yang \headeretal: Posterior-Aware Online Matching of EV--Charger Pairs under Delayed Anonymous Telemetry}
@@ -75,14 +75,14 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     To recover this missing link without adding new communication hardware, Baba and Imanaka~\cite{b13} introduced Modulated Charging Current Technology (MCCT), which modulates the charger-side allowable current and infers the EV--charger association by comparing the charger-side reference with the EV-side current response.
     Nomura~\textit{et al.}~\cite{b14} extended MCCT to static multi-pair matching on a Wallbox Pulsar Plus AC charger and a Tesla Model~3 RWD Standard Range Plus setup.
     Their data-driven current-generation model was built from console command values, charger-cloud current measurements, and EV-cloud current measurements, and it included sampling intervals, command-to-measurement delays, and a charger--EV current-shape offset.
-    Using correlation--Euclidean and correlation--dynamic-time-warping (DTW) cost matrices solved by the Hungarian method~\cite{b15}, they reported pairing accuracy above 99\% for 300 simultaneous pairs at a 30\,s EV sampling interval.
+    Using correlation--Euclidean and correlation--dynamic-time-warping (DTW) cost matrices solved by the Hungarian method~\cite{b15}, they reported pairing accuracy above 99\% for 300 simultaneous pairs at a 30\,\text{sec} EV sampling interval.
 
     This prior evaluation provides the measurement-based foundation for the present work, but its identification setting remains static: all EV--charger pairs are assumed to start simultaneously, the relevant waveforms are available when the cost matrix is constructed, and the assignment is solved as a one-shot batch problem.
     In actual cloud-connected operation, EV sessions arrive and depart asynchronously, and EV-side observations become available only as delayed, anonymous, and imperfect telemetry.
     The problem therefore shifts from static waveform assignment over completed traces to online identification from maturing evidence.
 
-    This paper extends prior measurement-based MCCT modeling from static batch assignment to online pair identification under asynchronous sessions and delayed anonymous EV-side telemetry.
-    It formulates the task as a sequential online one-to-one matching problem under asymmetric observability and proposes a two-stage Bayesian posterior matcher (hereafter the Posterior matcher) that combines timing and waveform evidence through a two-stage posterior update before watermark-based finalization, where the \emph{watermark}, an event-time data-maturity rule~\cite{b26}, declares when delayed telemetry is complete enough to decide.
+    This paper proposes online pair identification algorithms under asynchronous sessions and delayed anonymous EV-side telemetry.
+    It formulates the task as a sequential online one-to-one matching problem under asymmetric observability and proposes a two-stage Bayesian posterior matcher (hereafter the Posterior matcher) that combines timing and waveform evidence through a two-stage posterior update before finalization governed by an event-time watermark. The watermark is a data-maturity boundary~\cite{b26}: once it is reached, telemetry with event timestamps up to the effective observation-window end is assumed to have arrived, making the accumulated evidence sufficiently complete for an irrevocable matching decision.
     The contribution is not Bayesian updating alone; it is an online MCCT formulation under two-plane asymmetric observability, combined with a sequential posterior decision rule that carries belief across update stages and is evaluated at a shared watermark.
 
     The main contributions of this paper are as follows:
@@ -145,6 +145,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     \subsection{Operational Objective and Two-Plane Observability}
     Let $i \in E$ denote an EV session and $s \in S$ denote an EVSE slot, where $E$ and $S$ are the session and slot sets.
     The operational objective is to emit an online finalized mapping $\hat{m}(i) \in S$ that matches the true EVSE slot of session $i$, with one-to-one consistency enforced among simultaneously finalized matches.
+    Here $m(i)$ denotes the true admission mapping from EV session $i$ to the EVSE slot it occupies; in other words, $m(i)=s$ means session $i$ is connected to slot $s$.
     Each EVSE slot is physically exclusive: at any time $t$, slot $s$ hosts at most one session, so for any two sessions $i \neq j$ admitted to the same slot ($m(i) = m(j) = s$, where $m$ denotes the true admission mapping) the active intervals $[t_{\text{arr},i}, t_{\text{end},i}]$ (from arrival $t_{\text{arr},i}$ to session end $t_{\text{end},i}$) are disjoint.
     An arriving EV is admitted to a slot that is free at $t_{\text{arr},i}$; admission scheduling is therefore not a degree of freedom of the matcher.
 
@@ -163,7 +164,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     \begin{equation}\label{eq:e1}
         W = \tau \cdot N_{\text{steps}},
     \end{equation}
-    where $\tau = 60$\,s and $N_{\text{steps}} = 6$, yielding $W = 360$\,s.
+    where $\tau = 60$\,\text{sec} and $N_{\text{steps}} = 6$, yielding $W = 360$\,\text{sec}.
     This window length follows the MCCT observation convention of prior work~\cite{b13},~\cite{b14}, keeping the matching task directly comparable.
     The nominal decision-window end is $t_{\text{win},i} = t_{\text{arr},i} + W$.
     The runtime does not, however, finalize exactly at $t_{\text{win},i}$ because EV-side telemetry may still be in transit.
@@ -205,7 +206,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
     \begin{figure*}[!t]
         \centerline{\includegraphics[width=\textwidth]{figure2_event_driven_runtime.pdf}}
-        \caption{Shared event-driven runtime used by all compared matchers. The entire loop---arrivals, maturity, candidate gating, cost-matrix construction, assignment, and finalization---re-runs at every evaluation tick ({\unboldmath$\Delta t_{\mathrm{eval}} = 5$\,s}). All four matchers use identical watermark maturity, candidate gating, batch construction, and per-batch one-to-one finalization timing; they differ only in cost-matrix construction. The Posterior matcher additionally applies a two-stage posterior update before constructing the cost matrix.}
+        \caption{Shared event-driven runtime used by all compared matchers. The entire loop---arrivals, maturity, candidate gating, cost-matrix construction, assignment, and finalization---re-runs at every evaluation tick ({\unboldmath$\Delta t_{\mathrm{eval}} = 5$\,\text{sec}}). All four matchers use identical watermark maturity, candidate gating, batch construction, and per-batch one-to-one finalization timing; they differ only in cost-matrix construction. The Posterior matcher additionally applies a two-stage posterior update before constructing the cost matrix.}
         \label{fig02}
     \end{figure*}
 
@@ -214,7 +215,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     This section presents the four matchers compared in this study, all of which operate inside the shared event-driven runtime introduced in Section~III.
 
     \subsection{Event-Driven Runtime}
-    The runtime is explicitly event-driven with evaluation interval $\Delta t_{\text{eval}} = 5$\,s.
+    The runtime is explicitly event-driven with evaluation interval $\Delta t_{\text{eval}} = 5$\,\text{sec}.
     At each evaluation tick the runtime updates the pending session set, checks maturity via $t_{\text{wm}} = t_{\text{eff}} + d_{\max}$ with $t_{\text{eff}}$ clamped per Eq.~\eqref{eq:e3}, constructs candidate slot sets via Eq.~\eqref{eq:e4} with margin $\Delta$, evaluates pairwise compatibility on the watermark-visible prefix, builds a cost matrix over the matured batch, and solves one-to-one assignment.
     Two fallback paths are supported: session-end (a session ends before watermark readiness) and timeline-end (pending sessions at scenario termination). In the main base-load regime the fallback ratio remains zero.
     Fig.~\ref{fig02} shows this shared loop; its shared band marks the components common to all four matchers---watermark maturity, candidate gating, batch construction, and the assignment solver---isolating the cost-matrix block as the only divergence point among Time-prior, Greedy, Global, and Posterior.
@@ -297,7 +298,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
         P_c(s|i) = \frac{\exp\!\big(-\beta_{\text{curr}}\,\frac{c_{i,s}-c_i^{\min}}{\sigma_i}\big)}{\sum_{s'\in C_i}\exp\!\big(-\beta_{\text{curr}}\,\frac{c_{i,s'}-c_i^{\min}}{\sigma_i}\big)},
     \end{equation}
     where $c_{i,s}$ is the refined DTW and step-signature waveform cost (cf.\ Eq.~\eqref{eq:e6}--\eqref{eq:e7}) on the watermark-visible prefix, $c_i^{\min}=\min_{s\in C_i}c_{i,s}$, and $\sigma_i$ is the median absolute deviation of $\{c_{i,s}\}_{s\in C_i}$ (if it falls below $10^{-6}$, the standard deviation is used instead, then the value range, then unity); the two update stages evaluate $c_{i,s}$ on the first $60\%$ and on the full matured prefix, respectively (TABLE~\ref{table:hyper}).
-    The time prior $P_t(s|i)$ is the temporal-overlap weight between the candidate slot's active interval and the EV-side window $[t_{\text{arr},i}, t_{\text{eff},i}]$: writing $\Delta\tau_{i,s}$ for the boundary distance and $q^{75}_i$ for the $75$th percentile of $\{\Delta\tau_{i,s}\}_{s\in C_i}$ (floored at 1\,s), the shaped prior is
+    The time prior $P_t(s|i)$ is the temporal-overlap weight between the candidate slot's active interval and the EV-side window $[t_{\text{arr},i}, t_{\text{eff},i}]$: writing $\Delta\tau_{i,s}$ for the boundary distance and $q^{75}_i$ for the $75$th percentile of $\{\Delta\tau_{i,s}\}_{s\in C_i}$ (floored at 1\,\text{sec}), the shaped prior is
     \begin{equation}\label{eq:shaped}
         P_t^{\text{shaped}}(s|i)\propto\exp\!\left(-\alpha_{\text{time}}\,\frac{\Delta\tau_{i,s}}{q^{75}_i}\right),
     \end{equation}
@@ -354,10 +355,10 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     Although the present study is simulation-based, its signal foundation is measurement-derived: Layer~1 reuses the data-driven current-generation model that Nomura~\textit{et al.}~\cite{b14} fitted to real Wallbox Pulsar Plus and Tesla Model~3 current measurements, so the simulated waveforms retain measured response features from that Wallbox--Tesla equipment pair rather than idealized step shapes.
 
     \textbf{Layer~1: Measurement-based current-generation model.}
-    The charger-side command sequence follows a fixed six-step MCCT-style structure with $\tau = 60$\,s (yielding an observation window of $W = 360$\,s), and the EVSE-side reference is generated through the data-driven response model of Nomura~\textit{et al.}~\cite{b14}, fitted from EV and EVSE current measurements collected on a Wallbox Pulsar Plus AC charger and a Tesla Model~3 RWD Standard Range Plus under the original Baba--Imanaka equipment setup~\cite{b13}; as reported by Nomura~\textit{et al.}~\cite{b14}, these measurements were obtained from the YourStand AC charging-service deployment.
+    The charger-side command sequence follows a fixed six-step MCCT-style structure with $\tau = 60$\,\text{sec} (yielding an observation window of $W = 360$\,\text{sec}), and the EVSE-side reference is generated through the data-driven response model of Nomura~\textit{et al.}~\cite{b14}, fitted from EV and EVSE current measurements collected on a Wallbox Pulsar Plus AC charger and a Tesla Model~3 RWD Standard Range Plus under the original Baba--Imanaka equipment setup~\cite{b13}; as reported by Nomura~\textit{et al.}~\cite{b14}, these measurements were obtained from the YourStand AC charging-service deployment.
     The model captures three behaviors---delayed change onset, target-current offset, and asymmetric ramp---broadly consistent with real-world AC-charging current behavior reported in independent measurement-based studies~\cite{bferretti24}, and already incorporates measurement timing and current-shape offset effects observed in the Wallbox--Tesla setup.
-    The command-to-current response lag used for waveform generation is modeled as 15\,s for the first nonzero charging step and 5\,s for subsequent setpoint changes.
-    The 15\,s value is treated as a waveform-generation assumption informed by the EV charging full-activation-time (FAT) ranges reported by Imanaka and Baba~\cite{bimanaka25}.
+    The command-to-current response lag used for waveform generation is modeled as 15\,\text{sec} for the first nonzero charging step and 5\,\text{sec} for subsequent setpoint changes.
+    The 15\,\text{sec} value is treated as a waveform-generation assumption informed by the EV charging full-activation-time (FAT) ranges reported by Imanaka and Baba~\cite{bimanaka25}.
     These values do not represent backend telemetry-arrival delay, which is modeled separately in the cloud-ingestion layer.
     The remaining fitted parameters are
     \begin{equation}\label{eq:e14}
@@ -378,10 +379,10 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     Within the present envelope (at most 500 sessions) the global capacity is never reached, so overall and requested-session accuracy coincide throughout the reported results; both are nonetheless retained because they diverge under saturation (future work).
 
     \textbf{Layer~3: Cloud-ingestion and telemetry imperfection.}
-    The EV-side signal is formed by applying sensing distortion to the EVSE-side current: each sample is subject to additional sensing delay (max 20\,s) and start-estimate jitter (20\,s), and carries multiplicative gain variation (std~0.03), additive bias (std~0.35\,A), and additive noise (std~0.20\,A).
-    Cloud-ingestion delay and packet loss follow an evidence-informed baseline: mean ingestion delay 2.0\,s, delay jitter (std) 1.0\,s, and packet-loss probability 0.005. These three values are engineering assumptions that fix a low-second-scale ingestion envelope, not field measurements of a specific EV-cloud service. The cited transport and broadband references~\cite{b23},~\cite{b24},~\cite{b25} motivate only the order of magnitude; because network round-trip is sub-second, the 2.0\,s mean represents application-level ingestion rather than transport delay. The 10.0\,s ingestion-delay cap follows the commercial OCPP MessageTimeout default~\cite{bzaptec},~\cite{b22} and is distinct from the decision-side watermark bound $d_{\max}$ of Eq.~\eqref{eq:e2}.
+    The EV-side signal is formed by applying sensing distortion to the EVSE-side current: each sample is subject to additional sensing delay (max 20\,\text{sec}) and start-estimate jitter (20\,\text{sec}), and carries multiplicative gain variation (std~0.03), additive bias (std~0.35\,A), and additive noise (std~0.20\,A).
+    Cloud-ingestion delay and packet loss follow an evidence-informed baseline: mean ingestion delay 2.0\,\text{sec}, delay jitter (std) 1.0\,\text{sec}, and packet-loss probability 0.005. These three values are engineering assumptions that fix a low-second-scale ingestion envelope, not field measurements of a specific EV-cloud service. The cited transport and broadband references~\cite{b23},~\cite{b24},~\cite{b25} motivate only the order of magnitude; because network round-trip is sub-second, the 2.0\,\text{sec} mean represents application-level ingestion rather than transport delay. The 10.0\,\text{sec} ingestion-delay cap follows the commercial OCPP MessageTimeout default~\cite{bzaptec},~\cite{b22} and is distinct from the decision-side watermark bound $d_{\max}$ of Eq.~\eqref{eq:e2}.
     The EVSE-side stream is not subjected to the same delay or loss model, since the control console is assumed to know the EVSE-side reference directly; this asymmetry is part of the problem definition.
-    Four distinct delay quantities appear in the model and should not be conflated: the command-to-current response lag of the waveform-generation model (15\,s and 5\,s, Layer~1); the EV-side sensing and start-estimate delay (Layer~3 sensing distortion); the network cloud-ingestion delay (mean 2\,s, practical max 10\,s; TABLE~\ref{table3}); and the watermark bound $d_{\max}$ that governs when accumulated evidence is judged mature for finalization (Eq.~\eqref{eq:e2}). Only the watermark bound is a decision-side parameter; the other three delays describe how the EV-side evidence is generated and transported.
+    Four distinct delay quantities appear in the model and should not be conflated: the command-to-current response lag of the waveform-generation model (15\,\text{sec} and 5\,\text{sec}, Layer~1); the EV-side sensing and start-estimate delay (Layer~3 sensing distortion); the network cloud-ingestion delay (mean 2\,\text{sec}, practical max 10\,\text{sec}; TABLE~\ref{table3}); and the watermark bound $d_{\max}$ that governs when accumulated evidence is judged mature for finalization (Eq.~\eqref{eq:e2}). Only the watermark bound is a decision-side parameter; the other three delays describe how the EV-side evidence is generated and transported.
     The numerical results in Section~VI should be read as statements about this evaluation envelope and the ranking among the four matchers, not as absolute field predictions.
 
     \begin{table}[htbp]
@@ -394,19 +395,19 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
             \toprule
             \textbf{Parameter} & \textbf{Default} & \textbf{Basis or proxy} \\
             \midrule
-            Mean ingestion delay & 2.0\,s & WebSocket and TCP~\cite{b23},~\cite{b24} \\
-            Delay jitter (std) & 1.0\,s & TCP retransmission~\cite{b24} \\
-            Ingestion-delay cap & 10.0\,s & OCPP MessageTimeout~\cite{bzaptec} \\
+            Mean ingestion delay & 2.0\,\text{sec} & WebSocket and TCP~\cite{b23},~\cite{b24} \\
+            Delay jitter (std) & 1.0\,\text{sec} & TCP retransmission~\cite{b24} \\
+            Ingestion-delay cap & 10.0\,\text{sec} & OCPP MessageTimeout~\cite{bzaptec} \\
             Packet-loss probability & 0.005 & FCC broadband, sub-1\% loss~\cite{b25} \\
             EVSE-side delay and loss & None & Console-direct \\
-            EV sampling period $\Delta t_{\text{EV}}$ & 30\,s & OCPP MeterValue interval~\cite{babb} \\
+            EV sampling period $\Delta t_{\text{EV}}$ & 30\,\text{sec} & OCPP MeterValue interval~\cite{babb} \\
             \bottomrule
         \end{tabular}
     \end{table}
 
     \subsection{Evaluation Design}
     The main base-load comparison uses EV-session counts of 100, 300, and 500 with 20 repeated simulations per operating point.
-    Additional experiments vary EV sample interval (5, 15, 30\,s), watermark delay bound (5, 10, 15\,s), and candidate margin (60, 120, 180\,s).
+    Additional experiments vary EV sample interval (5, 15, 30\,\text{sec}), watermark delay bound (5, 10, 15\,\text{sec}), and candidate margin (60, 120, 180\,\text{sec}).
     Error bars denote 95\,\% confidence intervals from the evaluation repeats at each operating point (20 repeats at $EV \in \{100,500\}$ and the 15 held-out repeats at $EV=300$) under a normal approximation.
     The default experimental preset is summarized in TABLE~\ref{table5}.
     \begin{table}[htbp]
@@ -423,10 +424,10 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
             Pattern assignment mode & dynamic session \\
             Pattern unique count & 50 \\
             Command step count & 6 \\
-            $\tau$ values & 60\,s \\
-            EV sample interval sweep & 5\,s, 15\,s, 30\,s \\
-            Watermark delay bound $d_{\max}$ sweep & 5\,s, 10\,s, 15\,s \\
-            Candidate margin $\Delta$ sweep & 60\,s, 120\,s, 180\,s \\
+            $\tau$ values & 60\,\text{sec} \\
+            EV sample interval sweep & 5\,\text{sec}, 15\,\text{sec}, 30\,\text{sec} \\
+            Watermark delay bound $d_{\max}$ sweep & 5\,\text{sec}, 10\,\text{sec}, 15\,\text{sec} \\
+            Candidate margin $\Delta$ sweep & 60\,\text{sec}, 120\,\text{sec}, 180\,\text{sec} \\
             Error bars & 95\,\% confidence interval \\
             \bottomrule
         \end{tabular}
@@ -455,7 +456,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
     The representative operating point is
     \begin{equation}\label{eq:e16}
-        (EV,\; \Delta,\; d_{\max},\; \Delta t_{\text{EV}}) = (500,\; 120\text{\,s},\; 10\text{\,s},\; 30\text{\,s}).
+        (EV,\; \Delta,\; d_{\max},\; \Delta t_{\text{EV}}) = (500,\; 120\text{\,\text{sec}},\; 10\text{\,\text{sec}},\; 30\text{\,\text{sec}}).
     \end{equation}
 
     \subsection{Calibration Protocol}
@@ -488,9 +489,9 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
     At $EV = 500$, the Posterior matcher reduces the misidentification rate from $6.3\,\%$ (greedy) to $3.0\,\%$, and from $10.5\,\%$ (global) to $3.0\,\%$ ($51\,\%$ and $71\,\%$ relative reductions).
     These reductions reflect posterior-based cost construction rather than a tighter single-shot metric.
     Notably, the Global matcher ($0.90$) trails the simpler Greedy matcher ($0.94$), consistent with its multiplicative correlation--DTW score having been designed for complete static waveforms rather than the truncated, noise-perturbed prefixes visible at the watermark instant; transferring the prior MCCT-style static cost directly into the online prefix regime is thus not by itself sufficient.
-    The time-prior baseline reaches $0.71$ because the candidate-time gate ($\Delta = 120$\,s) restricts each EV to an operationally plausible candidate set, so timing alone resolves many cases; the remaining $29\,\%$ is where waveform evidence becomes decisive.
+    The time-prior baseline reaches $0.71$ because the candidate-time gate ($\Delta = 120$\,\text{sec}) restricts each EV to an operationally plausible candidate set, so timing alone resolves many cases; the remaining $29\,\%$ is where waveform evidence becomes decisive.
 
-    The accuracy advantage is obtained under identical decision timing: every matcher uses the same maturity and evaluation-tick rule, so the 90th-percentile decision latency is $416\,\text{s}$ for all four methods.
+    The accuracy advantage is obtained under identical decision timing: every matcher uses the same maturity and evaluation-tick rule, so the 90th-percentile decision latency is $416\,\text{sec}$ for all four methods.
     Finalization can occur after the nominal $t_{\text{wm},i}=t_{\text{eff},i}+d_{\max}$ because the relevant EV-side sample must be generated, sensed, ingested, and processed at the next evaluation tick.
     At $EV = 500$, the Greedy and Posterior matchers have similar total runtimes while the Global matcher is slower (TABLE~\ref{table6}), and cost construction dominates over fallback handling, so the accuracy improvement does not result from additional waiting.
     The requested-session accuracy dispersion across the evaluation repeats is small relative to the inter-matcher gaps.
@@ -517,7 +518,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
     \textbf{EV sampling period.}
     The ranking is preserved at every sampling period within the evaluated range (Fig.~\ref{fig06}).
-    Across $\Delta t_{\text{EV}} \in \{5, 15, 30\}$\,s at $EV = 500$, the Posterior matcher attains $0.95$, $0.96$, and $0.97$, respectively. Under the fixed ingestion and sensing assumptions of Section~V-A, this nondecreasing trend suggests that denser sampling adds more noise-perturbed points to the truncated prefix without adding decision-relevant structure.
+    Across $\Delta t_{\text{EV}} \in \{5, 15, 30\}$\,\text{sec} at $EV = 500$, the Posterior matcher attains $0.95$, $0.96$, and $0.97$, respectively. Under the fixed ingestion and sensing assumptions of Section~V-A, this nondecreasing trend suggests that denser sampling adds more noise-perturbed points to the truncated prefix without adding decision-relevant structure.
     Its advantage over the greedy waveform baseline remains within a narrow band of $0.02$--$0.03$.
 
     \begin{figure}[!t]
@@ -528,10 +529,10 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
     \textbf{Watermark and candidate margin.}
     Moderate watermark values are sufficient under the present ingestion model.
-    At $EV = 500$, the three non-trivial matchers remain stable across $d_{\max} \in \{5, 10, 15\}$\,s, with variation less than $0.01$.
+    At $EV = 500$, the three non-trivial matchers remain stable across $d_{\max} \in \{5, 10, 15\}$\,\text{sec}, with variation less than $0.01$.
     The time-prior baseline stays near $0.70$ over the same range.
-    The Posterior matcher moves only from $0.96$ at $\Delta = 60$\,s to $0.97$ at $120$\,s and stabilizes at $0.97$ through $180$\,s.
-    The temporal gate in Eq.~\eqref{eq:e4} retains the ground-truth slot for all admitted sessions in the evaluated envelope ($\approx$28 candidates per EV on average at the representative $\Delta = 120$\,s, with no fallback-to-all activations).
+    The Posterior matcher moves only from $0.96$ at $\Delta = 60$\,\text{sec} to $0.97$ at $120$\,\text{sec} and stabilizes at $0.97$ through $180$\,\text{sec}.
+    The temporal gate in Eq.~\eqref{eq:e4} retains the ground-truth slot for all admitted sessions in the evaluated envelope ($\approx$28 candidates per EV on average at the representative $\Delta = 120$\,\text{sec}, with no fallback-to-all activations).
     The $\Delta$ sensitivity above therefore reflects matcher discrimination rather than upstream candidate loss.
 
     \textbf{Sensing parameters and high-load stress.}
@@ -540,7 +541,7 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
     \subsection{Ablation and Discussion}
     Residual error stems from candidate-set ambiguity rather than from runtime-timing pathologies.
-    A representative success case, the session traced in Fig.~\ref{fig07}, reaches its full-window effective end at $t_{\text{eff}}=360$\,s after arrival and becomes mature at $t_{\text{wm}}=370$\,s (Eq.~\eqref{eq:e2}).
+    A representative success case, the session traced in Fig.~\ref{fig07}, reaches its full-window effective end at $t_{\text{eff}}=360$\,\text{sec} after arrival and becomes mature at $t_{\text{wm}}=370$\,\text{sec} (Eq.~\eqref{eq:e2}).
     Success and failure cases alike are finalized through the ordinary watermark path, and their latency differences reflect the sessions' $t_{\text{eff}}$ rather than any matcher-side early commitment, indicating that ordinary online finalization suffices under base load.
 
     The diagnostic index is not a runtime decision-tick sequence; it records how the top-1 and top-2 posterior scores separate across the checkpoint updates of a single watermark decision: three checkpoints per stage, taken after the carry-over, time-prior, and current-likelihood factors of Eq.~\eqref{eq:e10}.
