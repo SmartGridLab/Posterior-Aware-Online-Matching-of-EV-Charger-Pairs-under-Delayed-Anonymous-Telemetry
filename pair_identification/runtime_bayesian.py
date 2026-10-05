@@ -141,7 +141,7 @@ def _combine_checkpoint(
     space over ``keys`` and renormalized to sum to 1. This mirrors the algebra of
     :func:`update_posterior` but lets a partial combination (e.g. carry-over only,
     or carry-over + time-prior before the likelihood) be observed. It is used
-    exclusively to record the Figure 5 diagnostic checkpoints when
+    exclusively to record the Supplementary Fig. S1 diagnostic checkpoints (figure file figure5) when
     ``EVLINK_FIG5_TRACE=1`` and never participates in the assignment path.
     """
     if not keys:
@@ -304,7 +304,7 @@ class BayesianWindowedAssigner:
             posterior = dict(prev_post)
             current_like_last = {int(slot): 1.0 / float(max(1, len(candidates))) for slot in candidates}
             stage_trace: list[dict[str, Any]] = []
-            # Figure 5 diagnostic: when EVLINK_FIG5_TRACE=1, record the renormalized
+            # Supplementary Fig. S1 diagnostic (figure file figure5): when EVLINK_FIG5_TRACE=1, record the renormalized
             # posterior at three checkpoints inside each of the two update stages
             # (six checkpoints total). Purely observational; gated so the flag-off
             # assignment path and its performance are unchanged.

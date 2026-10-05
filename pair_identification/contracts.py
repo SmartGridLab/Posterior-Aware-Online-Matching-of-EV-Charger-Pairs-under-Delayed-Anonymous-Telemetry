@@ -36,3 +36,9 @@ class RuntimeConfig:
     time_prior_mix: float = 0.35
     posterior_prev_power: float = 0.60
     current_cost_weight: float = 0.15
+    # EV-grid front end (dense-sampling diagnostic): "hold" (manuscript) or "block_mean".
+    ev_grid_aggregation: str = "hold"
+    ev_grid_block_s: int = 30
+    # EV telemetry sampling period: ingestion delay and loss are drawn once per measurement,
+    # and the measurement's grid copies inherit that draw.
+    ev_measurement_period_s: int = 30

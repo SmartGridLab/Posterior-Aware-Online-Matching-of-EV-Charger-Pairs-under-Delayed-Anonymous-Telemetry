@@ -1,37 +1,43 @@
 matcher_family,variant,marker,linestyle,color,alpha,dodge,markerfill,ev_count,accuracy
-Greedy,Greedy (full),o,-,#ff7f0e,1.0,0.0,filled,100,98.2
-Greedy,Greedy (full),o,-,#ff7f0e,1.0,0.0,filled,300,95.98
-Greedy,Greedy (full),o,-,#ff7f0e,1.0,0.0,filled,500,93.74
-Greedy,without step-signature,s,-.,#ff7f0e,0.85,0.0,open,100,94.5
-Greedy,without step-signature,s,-.,#ff7f0e,0.85,0.0,open,300,88.8
-Greedy,without step-signature,s,-.,#ff7f0e,0.85,0.0,open,500,86.32
-Greedy,without DTW,^,--,#ff7f0e,0.85,0.0,open,100,97.55
-Greedy,without DTW,^,--,#ff7f0e,0.85,0.0,open,300,94.04
-Greedy,without DTW,^,--,#ff7f0e,0.85,0.0,open,500,90.73
+Greedy,Greedy (full),o,-,#ff7f0e,1.0,0.0,filled,100,99.6
+Greedy,Greedy (full),o,-,#ff7f0e,1.0,0.0,filled,300,98.91
+Greedy,Greedy (full),o,-,#ff7f0e,1.0,0.0,filled,500,97.32
+Greedy,without step-signature,s,-.,#ff7f0e,0.85,0.0,open,100,100.0
+Greedy,without step-signature,s,-.,#ff7f0e,0.85,0.0,open,300,99.89
+Greedy,without step-signature,s,-.,#ff7f0e,0.85,0.0,open,500,99.63
+Greedy,without DTW,^,--,#ff7f0e,0.85,0.0,open,100,98.3
+Greedy,without DTW,^,--,#ff7f0e,0.85,0.0,open,300,95.38
+Greedy,without DTW,^,--,#ff7f0e,0.85,0.0,open,500,92.13
 Greedy,all terms removed,D,:,#ff7f0e,0.85,0.0,open,100,91.65
 Greedy,all terms removed,D,:,#ff7f0e,0.85,0.0,open,300,80.29
 Greedy,all terms removed,D,:,#ff7f0e,0.85,0.0,open,500,71.21
-Global,Global (full),o,-,#2ca02c,1.0,0.0,filled,100,95.65
-Global,Global (full),o,-,#2ca02c,1.0,0.0,filled,300,91.51
-Global,Global (full),o,-,#2ca02c,1.0,0.0,filled,500,89.52
-Global,without correlation,s,-.,#2ca02c,0.85,0.0,open,100,92.5
-Global,without correlation,s,-.,#2ca02c,0.85,0.0,open,300,84.0
-Global,without correlation,s,-.,#2ca02c,0.85,0.0,open,500,77.71
-Global,without DTW,^,--,#2ca02c,0.85,0.0,open,100,95.3
-Global,without DTW,^,--,#2ca02c,0.85,0.0,open,300,90.07
-Global,without DTW,^,--,#2ca02c,0.85,0.0,open,500,87.84
+Greedy,two-prefix greedy,v,--,#ff7f0e,0.85,-9.0,open,100,99.6
+Greedy,two-prefix greedy,v,--,#ff7f0e,0.85,-9.0,open,300,98.84
+Greedy,two-prefix greedy,v,--,#ff7f0e,0.85,-9.0,open,500,97.98
+Greedy,two-prefix Hungarian,P,-.,#ff7f0e,0.85,9.0,open,100,99.6
+Greedy,two-prefix Hungarian,P,-.,#ff7f0e,0.85,9.0,open,300,98.84
+Greedy,two-prefix Hungarian,P,-.,#ff7f0e,0.85,9.0,open,500,97.98
+Global,Global (full),o,-,#2ca02c,1.0,0.0,filled,100,100.0
+Global,Global (full),o,-,#2ca02c,1.0,0.0,filled,300,99.89
+Global,Global (full),o,-,#2ca02c,1.0,0.0,filled,500,99.93
+Global,without correlation,s,-.,#2ca02c,0.85,0.0,open,100,99.5
+Global,without correlation,s,-.,#2ca02c,0.85,0.0,open,300,98.02
+Global,without correlation,s,-.,#2ca02c,0.85,0.0,open,500,97.16
+Global,without DTW,^,--,#2ca02c,0.85,0.0,open,100,99.85
+Global,without DTW,^,--,#2ca02c,0.85,0.0,open,300,98.69
+Global,without DTW,^,--,#2ca02c,0.85,0.0,open,500,97.03
 Global,all terms removed,D,:,#2ca02c,0.85,0.0,open,100,91.65
 Global,all terms removed,D,:,#2ca02c,0.85,0.0,open,300,80.29
 Global,all terms removed,D,:,#2ca02c,0.85,0.0,open,500,71.21
-Posterior,Posterior (full),o,-,#1f77b4,1.0,-9.0,filled,100,99.3
-Posterior,Posterior (full),o,-,#1f77b4,1.0,-9.0,filled,300,98.22
-Posterior,Posterior (full),o,-,#1f77b4,1.0,-9.0,filled,500,96.95
-Posterior,without time prior,D,:,#1f77b4,0.85,9.0,open,100,99.3
-Posterior,without time prior,D,:,#1f77b4,0.85,9.0,open,300,98.22
-Posterior,without time prior,D,:,#1f77b4,0.85,9.0,open,500,96.87
-Posterior,without carry-over,s,-.,#1f77b4,0.85,-9.0,open,100,98.2
-Posterior,without carry-over,s,-.,#1f77b4,0.85,-9.0,open,300,96.07
-Posterior,without carry-over,s,-.,#1f77b4,0.85,-9.0,open,500,93.76
-Posterior,all components removed,v,:,#1f77b4,0.85,9.0,open,100,98.2
-Posterior,all components removed,v,:,#1f77b4,0.85,9.0,open,300,95.98
-Posterior,all components removed,v,:,#1f77b4,0.85,9.0,open,500,93.74
+Posterior,Posterior (full),o,-,#1f77b4,1.0,-9.0,filled,100,99.75
+Posterior,Posterior (full),o,-,#1f77b4,1.0,-9.0,filled,300,99.07
+Posterior,Posterior (full),o,-,#1f77b4,1.0,-9.0,filled,500,98.38
+Posterior,without time prior,D,:,#1f77b4,0.85,9.0,open,100,99.75
+Posterior,without time prior,D,:,#1f77b4,0.85,9.0,open,300,99.07
+Posterior,without time prior,D,:,#1f77b4,0.85,9.0,open,500,98.3
+Posterior,without carry-over,s,-.,#1f77b4,0.85,-9.0,open,100,99.65
+Posterior,without carry-over,s,-.,#1f77b4,0.85,-9.0,open,300,98.91
+Posterior,without carry-over,s,-.,#1f77b4,0.85,-9.0,open,500,97.36
+Posterior,all components removed,v,:,#1f77b4,0.85,9.0,open,100,99.6
+Posterior,all components removed,v,:,#1f77b4,0.85,9.0,open,300,98.91
+Posterior,all components removed,v,:,#1f77b4,0.85,9.0,open,500,97.32

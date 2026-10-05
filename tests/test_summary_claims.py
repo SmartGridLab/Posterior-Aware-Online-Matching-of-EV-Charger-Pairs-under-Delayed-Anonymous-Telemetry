@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _summary() -> pd.DataFrame:
-    return pd.read_csv(ROOT / "case_study" / "scalability_analysis" / "accuracy" / "canonical_run_20260626_170431_105970" / "summary.csv")
+    return pd.read_csv(ROOT / "case_study" / "scalability_analysis" / "accuracy" / "canonical_run_20260907_111056_515561" / "summary.csv")
 
 
 def _row(summary: pd.DataFrame, **filters):
@@ -45,9 +45,9 @@ def test_representative_500_ev_claims():
     }
     expected_accuracy = {
         "time_only_baseline": 0.7121,
-        "single_only": 0.9374,
-        "nomura_original_interval_hungarian": 0.8952,
-        "bayesian_windowed": 0.9695,
+        "single_only": 0.9732,
+        "nomura_original_interval_hungarian": 0.9993,
+        "bayesian_windowed": 0.9838,
     }
     for algorithm_id, expected in expected_accuracy.items():
         row = _row(summary, algorithm_id=algorithm_id, **filters)
@@ -58,7 +58,7 @@ def test_representative_500_ev_claims():
 
 def test_a3_base_load_and_sampling_claims():
     summary = _summary()
-    for ev_count, expected in [(100, 0.9930), (300, 0.9810), (500, 0.9695)]:
+    for ev_count, expected in [(100, 0.9975), (300, 0.990667), (500, 0.9838)]:
         row = _row(
             summary,
             algorithm_id="bayesian_windowed",
@@ -69,7 +69,7 @@ def test_a3_base_load_and_sampling_claims():
         )
         assert row["accuracy_mean"] == pytest.approx(expected, abs=5e-6)
 
-    for ev_sample_s, expected in [(5, 0.9533), (15, 0.9579), (30, 0.9695)]:
+    for ev_sample_s, expected in [(5, 0.9495), (15, 0.9683), (30, 0.9838)]:
         row = _row(
             summary,
             algorithm_id="bayesian_windowed",

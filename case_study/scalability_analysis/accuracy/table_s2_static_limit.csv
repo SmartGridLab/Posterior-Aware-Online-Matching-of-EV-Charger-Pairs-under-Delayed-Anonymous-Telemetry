@@ -1,0 +1,7 @@
+cell,cell_label,algorithm_id,matcher,runs,accuracy_mean,accuracy_ci95,p90_latency_mean,blocked_evs_mean,session_end_before_watermark_ratio_mean,avg_candidates_per_ev_mean,runtime_s_total_mean,run_id
+ideal_sensing,ST-ideal (sensing distortion off),nomura_original_interval_hungarian,A2 Global (Corr+DTW + Hungarian; prior static cost),20,1.0,0.0,435.0,0.0,0.0,300.0,632.279,20260908_170955_253099
+ideal_sensing,ST-ideal (sensing distortion off),single_only,A1 Greedy,20,0.677167,0.020159,435.0,0.0,0.0,300.0,494.763,20260908_170955_253099
+ideal_sensing,ST-ideal (sensing distortion off),bayesian_windowed,A3 Posterior,20,1.0,0.0,435.0,0.0,0.0,300.0,476.903,20260908_170955_253099
+paper_sensing,ST-paper (TABLE 3 sensing defaults),nomura_original_interval_hungarian,A2 Global (Corr+DTW + Hungarian; prior static cost),20,0.952333,0.006424,407.925,0.0,0.0,300.0,471.188,20260909_020513_080213
+paper_sensing,ST-paper (TABLE 3 sensing defaults),single_only,A1 Greedy,20,0.5805,0.013984,407.925,0.0,0.0,300.0,358.069,20260909_020513_080213
+paper_sensing,ST-paper (TABLE 3 sensing defaults),bayesian_windowed,A3 Posterior,20,0.625667,0.01561,407.925,0.0,0.0,300.0,348.928,20260909_020513_080213

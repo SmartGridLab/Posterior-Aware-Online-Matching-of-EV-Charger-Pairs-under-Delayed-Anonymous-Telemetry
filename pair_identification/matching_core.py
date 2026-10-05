@@ -95,6 +95,22 @@ EV_SENSOR_BIAS_STD_A = _env_float("EVLINK_EV_SENSOR_BIAS_STD_A", 0.35, min_value
 EV_SENSOR_NOISE_STD_A = _env_float("EVLINK_EV_SENSOR_NOISE_STD_A", 0.20, min_value=0.0)
 EV_START_EST_JITTER_S = _env_int("EVLINK_EV_START_EST_JITTER_S", 20, min_value=0)
 CANDIDATE_TIME_MARGIN_S = _env_int("EVLINK_CANDIDATE_TIME_MARGIN_S", 120, min_value=0)
+# EV-grid front end (dense-sampling diagnostic): "hold" = the manuscript's causal forward-fill of
+# the Δt_EV samples onto the 5 s charger grid; "block_mean" = the Δt_EV samples inside each
+# EV_GRID_BLOCK_S block are averaged before the forward-fill (identical to "hold" at Δt_EV = 30 s).
+EV_GRID_AGGREGATION = (os.getenv("EVLINK_EV_GRID_AGGREGATION", "hold").strip().lower() or "hold")
+EV_GRID_BLOCK_S = _env_int("EVLINK_EV_GRID_BLOCK_S", 30, min_value=1)
+# Per-session response heterogeneity: when set, every admitted
+# session draws its first-step lag ~ U(lo, hi) s (1 s resolution) and its ramp rate ~ U(lo, hi) A/s
+# from a dedicated RNG stream (the scenario's own draws are untouched); None = the fitted model.
+RESPONSE_LAG_RANGE_S: tuple[float, float] | None = None
+# Codebook band sweep: command set-point band of the codebook generator. The
+# canonical band is {6, ..., 30} A; narrowing it forces similar commands
+# with the generator otherwise unchanged. LAST_CODEBOOK_INFO records whether the generator's
+# relaxation ladder was exhausted (terminal random-unique branch) for the last call.
+COMMAND_SETPOINT_RANGE: tuple[int, int] = (6, 30)
+LAST_CODEBOOK_INFO: dict = {}
+RESPONSE_RAMP_RANGE_A_PER_S: tuple[float, float] | None = None
 
 # Refined matching cost weights:
 # - Keep DTW as base term.
@@ -137,11 +153,16 @@ def generate_command_patterns(
     internal_min_gap: int = 4,
     consec_min_gap: int = 10,
     min_pairwise_l1: int = 45,
-    candidate_pool: int = 3000
+    candidate_pool: int = 3000,
+    setpoint_range: tuple[int, int] | None = None,
 ):
     import numpy as _np
     rnd = _np.random.RandomState(seed if seed is not None else _np.random.randint(0, 2**31-1))
-    allowed = _np.arange(6, 31, dtype=int)
+    lo, hi = (6, 30) if setpoint_range is None else (int(setpoint_range[0]), int(setpoint_range[1]))
+    if lo < 1 or hi <= lo or (hi - lo + 1) < 5:
+        raise ValueError(f"setpoint_range must span at least five integer set-points >= 1 A (got {(lo, hi)})")
+    allowed = _np.arange(lo, hi + 1, dtype=int)
+    ladder_rungs = 0
 
     def _valid_internal(vals: _np.ndarray, gap_all: int) -> bool:
         v = _np.asarray(vals, dtype=int)
@@ -196,7 +217,9 @@ def generate_command_patterns(
                 if len(filtered) == 0:
                     filtered = cand_arr.tolist()
                 cand_d = _np.abs(_np.array(filtered) - prev)
-                order = _np.argsort(-cand_d)
+                # Stable sort: equal distances keep their set-point order on every platform
+                # (the default introsort may reorder ties differently under SIMD dispatch).
+                order = _np.argsort(-cand_d, kind="stable")
                 topK = max(1, min(3, len(order)))
                 pick = int(filtered[int(order[rnd.randint(0, topK)])])
                 seq.append(pick); rem.remove(pick)
@@ -234,7 +257,10 @@ def generate_command_patterns(
         cands = _build_candidates(gap_all=gap, consec_gap=consec_min_gap, pool_n=candidate_pool)
         selected = _pick_farthest_proxy(cands, num_patterns, thr)
         if len(selected) >= num_patterns:
+            LAST_CODEBOOK_INFO.clear()
+            LAST_CODEBOOK_INFO.update({"terminal_branch": False, "ladder_rungs": int(ladder_rungs), "setpoint_range": (int(lo), int(hi))})
             return [list(p) for p in selected[:num_patterns]]
+        ladder_rungs += 1
         if thr > 30:
             thr -= 2
         elif consec_min_gap > 6:
@@ -250,7 +276,31 @@ def generate_command_patterns(
                 vals = rnd.choice(allowed, size=5, replace=False)
                 patterns.add(tuple([0] + vals.tolist()))
                 attempts += 1
+            LAST_CODEBOOK_INFO.clear()
+            LAST_CODEBOOK_INFO.update({"terminal_branch": True, "ladder_rungs": int(ladder_rungs), "setpoint_range": (int(lo), int(hi))})
             return [list(p) for p in patterns]
+
+
+def codebook_statistics(patterns) -> dict:
+    """Realised separation of a command codebook (codebook band sweep).
+
+    Pairwise ℓ1 set-point distance over the five non-zero steps (the ``_l1`` definition of the
+    generator), the minimum within-pattern set-point gap and the minimum consecutive-step change
+    between successive non-zero set-points, and the number of distinct patterns.
+    """
+    import itertools as _it
+    P = [[int(v) for v in p] for p in patterns]
+    uniq = {tuple(p) for p in P}
+    pair = [sum(abs(a - b) for a, b in zip(p[1:], q[1:])) for p, q in _it.combinations(P, 2)]
+    internal = [min(abs(a - b) for a, b in _it.combinations(p[1:], 2)) for p in P if len(p) > 2]
+    consec = [min(abs(p[k + 1] - p[k]) for k in range(1, len(p) - 1)) for p in P if len(p) > 2]
+    return {
+        "unique_patterns": int(len(uniq)),
+        "pairwise_l1_min_a": float(min(pair)) if pair else float("nan"),
+        "pairwise_l1_mean_a": float(sum(pair) / len(pair)) if pair else float("nan"),
+        "internal_gap_min_a": float(min(internal)) if internal else float("nan"),
+        "consec_step_min_a": float(min(consec)) if consec else float("nan"),
+    }
 
 # ----------------------------- Series helpers -----------------------------
 def reindex_at_times(series: pd.Series, times: pd.DatetimeIndex, method="pad", fill_value=0.0):
@@ -342,7 +392,7 @@ def _session_series_1s(session: dict, t_start: pd.Timestamp, t_end: pd.Timestamp
     for k in range(k0, k1 + 1):
         t_blk = s0 + pd.Timedelta(seconds=k * WINDOW)
         df_cmd = get_command_data(t_blk, pat, tau=TAU)
-        df_chg = generate_charger_current(df_cmd)
+        df_chg = generate_charger_current(df_cmd, **(session.get('response') or {}))
         ser = df_chg['charger_current']
         out.append(ser)
     if not out:
@@ -438,6 +488,11 @@ def build_dataset_with_random_arrivals(
         return [], sessions_empty, {}, {}, {}
 
     rng = np.random.default_rng(int(np.random.randint(0, 2**31 - 1)))
+    # Response-heterogeneity draws use their own stream so the scenario realisation (arrivals,
+    # slots, codebook, sensor draws, noise) is identical with and without heterogeneity.
+    heterogeneous = RESPONSE_LAG_RANGE_S is not None or RESPONSE_RAMP_RANGE_A_PER_S is not None
+    rng_resp = np.random.default_rng(int(np.random.randint(0, 2**31 - 1)) ^ 0x5E5510A5) if heterogeneous else None
+    response_draws: list[dict] = []
     base_ts = pd.Timestamp(base_initial_ts)
     t0_all = time.perf_counter()
     _log(f"[BUILD] base_ts={base_ts} | horizon=12h | last_arrival<=11h | slots={n_evses}")
@@ -453,7 +508,14 @@ def build_dataset_with_random_arrivals(
             consec_min_gap=8,
             min_pairwise_l1=40,
             candidate_pool=3000,
+            setpoint_range=tuple(COMMAND_SETPOINT_RANGE),
         )
+        codebook_diag = dict(codebook_statistics(patterns_list))
+        codebook_diag["terminal_branch"] = bool(LAST_CODEBOOK_INFO.get("terminal_branch", False))
+        codebook_diag["ladder_rungs"] = int(LAST_CODEBOOK_INFO.get("ladder_rungs", 0))
+        codebook_diag["setpoint_lo_a"] = int(COMMAND_SETPOINT_RANGE[0]); codebook_diag["setpoint_hi_a"] = int(COMMAND_SETPOINT_RANGE[1])
+        if codebook_diag["terminal_branch"]:
+            _log(f"[BUILD] codebook: relaxation ladder exhausted after {codebook_diag['ladder_rungs']} rungs -> terminal random-unique branch (no pairwise-l1 floor, no gap constraint); realised min pairwise l1 {codebook_diag['pairwise_l1_min_a']:.0f} A, mean {codebook_diag['pairwise_l1_mean_a']:.1f} A, band {COMMAND_SETPOINT_RANGE[0]}-{COMMAND_SETPOINT_RANGE[1]} A")
         patterns = {i: patterns_list[i] for i in range(n_evses)}
         feats_pool = [_pat_features(patterns[i]) for i in range(n_evses)]
         fixed_mode = False
@@ -461,6 +523,9 @@ def build_dataset_with_random_arrivals(
         arr_patterns = [list(p) for p in slot_fixed_patterns]
         if len(arr_patterns) < n_evses:
             raise ValueError("slot_fixed_patterns must have at least n_evses entries")
+        codebook_diag = dict(codebook_statistics(arr_patterns[:n_evses]))
+        codebook_diag["terminal_branch"] = False; codebook_diag["ladder_rungs"] = 0
+        codebook_diag["setpoint_lo_a"] = int(min(v for p in arr_patterns[:n_evses] for v in p[1:])); codebook_diag["setpoint_hi_a"] = int(max(v for p in arr_patterns[:n_evses] for v in p[1:]))
         patterns = {i: arr_patterns[i] for i in range(n_evses)}
         feats_pool = []
         fixed_mode = True
@@ -545,7 +610,18 @@ def build_dataset_with_random_arrivals(
             chosen_pat_idx = _pick_pattern_maximin(available_idxs, active_feats, feats_pool)
             chosen_pattern = patterns[chosen_pat_idx]
         busy_until[slot] = end_ts
-        sessions_by_slot[slot].append(dict(start_ts=arrival_ts, end_ts=end_ts, pattern=chosen_pattern))
+        session_rec = dict(start_ts=arrival_ts, end_ts=end_ts, pattern=chosen_pattern)
+        if heterogeneous:
+            resp = {}
+            if RESPONSE_LAG_RANGE_S is not None:
+                lo, hi = float(RESPONSE_LAG_RANGE_S[0]), float(RESPONSE_LAG_RANGE_S[1])
+                resp["first_step_lag_s"] = float(int(round(rng_resp.uniform(lo, hi))))
+            if RESPONSE_RAMP_RANGE_A_PER_S is not None:
+                lo, hi = float(RESPONSE_RAMP_RANGE_A_PER_S[0]), float(RESPONSE_RAMP_RANGE_A_PER_S[1])
+                resp["ramp_rate_a_per_s"] = float(rng_resp.uniform(lo, hi))
+            session_rec["response"] = resp
+            response_draws.append(resp)
+        sessions_by_slot[slot].append(session_rec)
         if not fixed_mode and chosen_pat_idx is not None:
             heapq.heappush(active_heap, (end_ts, chosen_pat_idx))
             active_pat_idxs.add(chosen_pat_idx)
@@ -557,17 +633,25 @@ def build_dataset_with_random_arrivals(
         sensor_noise_std = float(EV_SENSOR_NOISE_STD_A)
 
         times_1s = pd.date_range(start=arrival_ts, periods=window + 1, freq="1s")
-        slot_seg = _slot_series_1s_for_window(slot, arrival_ts, arrival_ts + pd.Timedelta(seconds=window), sessions_by_slot)
-        results = []; last = 0.0
+        # The EV meter reads the slot with its own delay, so the sample taken for the last
+        # timestamp of the window falls up to CHARGER_SAMPLE + EV_SENSOR_EXTRA_DELAY_MAX_S
+        # seconds past the window. Build the physical slot current over that longer segment so
+        # every sample reads a real current: the session re-issues its pattern for its whole
+        # duration, and _session_series_1s continues it into that range. Gain, bias, noise and
+        # the 1 A ceiling are then applied exactly once per sample, tail included.
+        sensor_seg_end = arrival_ts + pd.Timedelta(
+            seconds=window + int(CHARGER_SAMPLE) + int(EV_SENSOR_EXTRA_DELAY_MAX_S)
+        )
+        slot_seg = _slot_series_1s_for_window(slot, arrival_ts, sensor_seg_end, sessions_by_slot)
+        results = []
         for t in times_1s:
             t_sample = t + sensor_sample_dt
-            v = float(slot_seg[t_sample]) if t_sample in slot_seg.index else last
+            v = float(slot_seg.at[t_sample])
             meas = v * sensor_gain + sensor_bias
             if sensor_noise_std > 0.0:
                 meas += float(rng.normal(0.0, sensor_noise_std))
             cur = ceil_1a(max(0.0, meas))
             results.append({'timestamp': t, 'ev_current': cur})
-            last = cur
         df_ev = pd.DataFrame(results).set_index('timestamp')
         ev_series[ev_idx_assigned] = df_ev['ev_current'].copy()
 
@@ -600,6 +684,8 @@ def build_dataset_with_random_arrivals(
             ev_sensor_gain=float(sensor_gain),
             ev_sensor_bias_a=float(sensor_bias),
             ev_sensor_noise_std_a=float(sensor_noise_std),
+            response_first_step_lag_s=float(session_rec.get("response", {}).get("first_step_lag_s", 15.0)),
+            response_ramp_rate_a_per_s=(float(session_rec["response"]["ramp_rate_a_per_s"]) if session_rec.get("response", {}).get("ramp_rate_a_per_s") is not None else float("nan")),
         ))
         ev_idx_assigned += 1
 
@@ -612,7 +698,16 @@ def build_dataset_with_random_arrivals(
         "blocked_evs": int(blocked),
         "blocked_ratio": float(blocked / n_evs) if int(n_evs) > 0 else float("nan"),
         "blocked_sessions": list(blocked_sessions),
+        "codebook": dict(codebook_diag),
     }
+    if heterogeneous and response_draws:
+        lags = [r["first_step_lag_s"] for r in response_draws if "first_step_lag_s" in r]
+        ramps = [r["ramp_rate_a_per_s"] for r in response_draws if "ramp_rate_a_per_s" in r]
+        dataset_diag["response_heterogeneity"] = {
+            "sessions": int(len(response_draws)),
+            "lag_min_s": float(min(lags)) if lags else float("nan"), "lag_mean_s": float(np.mean(lags)) if lags else float("nan"), "lag_max_s": float(max(lags)) if lags else float("nan"),
+            "ramp_min_a_per_s": float(min(ramps)) if ramps else float("nan"), "ramp_mean_a_per_s": float(np.mean(ramps)) if ramps else float("nan"), "ramp_max_a_per_s": float(max(ramps)) if ramps else float("nan"),
+        }
     return ev_meta, sessions_by_slot, ev_series, patterns, dataset_diag
 
 # ----------------------------- Matching (online / incremental) -----------------------------
@@ -627,6 +722,15 @@ def _build_ev_grid_for_match(ev_meta, ev_series, ev_idx, window=WINDOW):
     ev_1s = ev_series[ev_idx]
     vals_30 = reindex_at_times(ev_1s, times_30s, method="pad")
     s30 = pd.Series(vals_30, index=times_30s, name='ev30')
+    if str(EV_GRID_AGGREGATION) == "block_mean":
+        # Average the Δt_EV samples inside each EV_GRID_BLOCK_S block (blocks start at the EV
+        # start estimate) and hold the block mean from the block start; at Δt_EV = block length
+        # this is the plain forward-fill.
+        block_s = max(1, int(EV_GRID_BLOCK_S))
+        offsets = ((times_30s - t0).total_seconds() // block_s).astype(int)
+        block_means = pd.Series(np.asarray(vals_30, dtype=float)).groupby(np.asarray(offsets)).mean()
+        block_times = pd.DatetimeIndex([t0 + pd.Timedelta(seconds=int(k) * block_s) for k in block_means.index])
+        s30 = pd.Series(block_means.to_numpy(dtype=float), index=block_times, name='ev30')
     ev_5s_vals = reindex_at_times(s30, times_5s, method="pad").astype(float)
     return times_5s, ev_5s_vals
 
@@ -695,6 +799,9 @@ def run_timeline_and_match(
         time_prior_mix=max(0.0, float(TIME_PRIOR_MIX)),
         posterior_prev_power=max(0.0, float(POSTERIOR_PREV_POWER)),
         current_cost_weight=float(np.clip(float(CURRENT_COST_WEIGHT), 0.0, 1.0)),
+        ev_grid_aggregation=str(EV_GRID_AGGREGATION),
+        ev_grid_block_s=int(EV_GRID_BLOCK_S),
+        ev_measurement_period_s=max(1, int(EV_SAMPLE)),
     )
     coarse_fn = _coarse_cost_from_grids if coarse_cost_fn is None else coarse_cost_fn
     refined_fn = _refined_cost_from_grids if refined_cost_fn is None else refined_cost_fn

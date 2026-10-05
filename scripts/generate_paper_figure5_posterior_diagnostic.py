@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate manuscript Figure 5: posterior diagnostic."""
+"""Generate figure file figure5 (Supplementary Fig. S1): posterior diagnostic."""
 
 from __future__ import annotations
 

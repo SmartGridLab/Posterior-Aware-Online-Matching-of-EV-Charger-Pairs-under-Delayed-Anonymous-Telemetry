@@ -1,0 +1,27 @@
+variant,variant_label,ev_sample_s,algorithm_id,runs,accuracy_mean,accuracy_ci95,delta_vs_canonical_mean,delta_vs_canonical_ci95,delta_vs_30s_mean,delta_vs_30s_ci95,run_id
+canonical,"(i) TABLE 3 sensing, hold",5,single_only,20,0.935,0.005282,0.0,0.0,,,20260907_111056_515561 (canonical)
+canonical,"(i) TABLE 3 sensing, hold",5,bayesian_windowed,20,0.9495,0.005761,0.0,0.0,,,20260907_111056_515561 (canonical)
+canonical,"(i) TABLE 3 sensing, hold",15,single_only,20,0.9691,0.003347,0.0,0.0,,,20260907_111056_515561 (canonical)
+canonical,"(i) TABLE 3 sensing, hold",15,bayesian_windowed,20,0.9683,0.004222,0.0,0.0,,,20260907_111056_515561 (canonical)
+canonical,"(i) TABLE 3 sensing, hold",30,single_only,20,0.9732,0.003494,0.0,0.0,,,20260907_111056_515561 (canonical)
+canonical,"(i) TABLE 3 sensing, hold",30,bayesian_windowed,20,0.9838,0.003241,0.0,0.0,,,20260907_111056_515561 (canonical)
+noise_free,"(ii) sample noise off, hold",5,single_only,20,0.9466,0.005592,0.0116,0.006835,,,20260909_112529_182567
+noise_free,"(ii) sample noise off, hold",5,bayesian_windowed,20,0.9491,0.004768,-0.0004,0.005421,,,20260909_112529_182567
+noise_free,"(ii) sample noise off, hold",15,single_only,20,0.9659,0.00284,-0.0032,0.004124,,,20260909_144709_767904
+noise_free,"(ii) sample noise off, hold",15,bayesian_windowed,20,0.9658,0.003367,-0.0025,0.004952,,,20260909_144709_767904
+noise_free,"(ii) sample noise off, hold",30,single_only,20,0.977,0.003482,0.0038,0.00532,,,20260909_172229_409746
+noise_free,"(ii) sample noise off, hold",30,bayesian_windowed,20,0.9832,0.003058,-0.0006,0.004285,,,20260909_172229_409746
+block_mean,"(iii) TABLE 3 sensing, 30 s block mean",5,single_only,20,0.9299,0.007073,-0.0051,0.005718,,,20260909_194237_669442
+block_mean,"(iii) TABLE 3 sensing, 30 s block mean",5,bayesian_windowed,20,0.9439,0.006212,-0.0056,0.005318,,,20260909_194237_669442
+block_mean,"(iii) TABLE 3 sensing, 30 s block mean",15,single_only,20,0.9541,0.003762,-0.015,0.003044,,,20260909_214145_198227
+block_mean,"(iii) TABLE 3 sensing, 30 s block mean",15,bayesian_windowed,20,0.9602,0.003767,-0.0081,0.004125,,,20260909_214145_198227
+term_partition,"(iv) TABLE 3 sensing, hold — Eq. (6) term partition (A1 variants)",5,single_only_step_off,20,0.9028,0.005923,-0.0322,0.00626,-0.0935,0.005707,20260909_231451_372267
+term_partition,"(iv) TABLE 3 sensing, hold — Eq. (6) term partition (A1 variants)",5,single_only_dtw_off,20,0.9122,0.005801,-0.0228,0.003176,-0.0091,0.00915,20260909_231451_372267
+term_partition,"(iv) TABLE 3 sensing, hold — Eq. (6) term partition (A1 variants)",15,single_only_step_off,20,0.9773,0.003086,0.0082,0.004743,-0.019,0.003187,20260910_004312_316315
+term_partition,"(iv) TABLE 3 sensing, hold — Eq. (6) term partition (A1 variants)",15,single_only_dtw_off,20,0.9424,0.005168,-0.0267,0.003232,0.0211,0.008811,20260910_004312_316315
+term_partition,"(iv) TABLE 3 sensing, hold — Eq. (6) term partition (A1 variants)",30,single_only_step_off,20,0.9963,0.001433,0.0231,0.004114,0.0,0.001898,20260910_021212_788641
+term_partition,"(iv) TABLE 3 sensing, hold — Eq. (6) term partition (A1 variants)",30,single_only_dtw_off,20,0.9213,0.007862,-0.0519,0.006488,0.0,0.010412,20260910_021212_788641
+alignment_control,"(v) TABLE 3 sensing, hold — EV meter offset fixed at the charger sampling period",5,single_only,20,0.9991,0.000773,0.0641,0.005479,,,20260910_180742_322660
+alignment_control,"(v) TABLE 3 sensing, hold — EV meter offset fixed at the charger sampling period",5,bayesian_windowed,20,0.9996,0.000384,0.0501,0.005734,,,20260910_180742_322660
+alignment_control,"(v) TABLE 3 sensing, hold — EV meter offset fixed at the charger sampling period",5,single_only_step_off,20,0.9996,0.000384,0.0968,0.005821,,,20260910_180742_322660
+alignment_control,"(v) TABLE 3 sensing, hold — EV meter offset fixed at the charger sampling period",5,nomura_original_interval_hungarian,20,0.9998,0.000288,0.0615,0.005372,,,20260910_180742_322660

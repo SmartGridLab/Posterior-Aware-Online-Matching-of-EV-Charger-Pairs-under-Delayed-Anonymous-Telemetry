@@ -1,0 +1,74 @@
+{
+  "config_hash": "3f2b5a8fb3fffdab239693207bcaa7d708d20a0bb6324163a8c1741f478b736b",
+  "run_type": "algorithm_compare",
+  "run_started": "2026-09-09 11:26:55",
+  "base_seed": 2187632392,
+  "repeats": 20,
+  "ev_counts": [
+    100,
+    300,
+    500
+  ],
+  "evse_count": 50,
+  "sim_hours": 12.0,
+  "session_min_minutes": 10.0,
+  "session_max_minutes": 60.0,
+  "pattern_mode": "current",
+  "pattern_modes": [
+    "current"
+  ],
+  "pattern_assignment_mode": "dynamic_session",
+  "pattern_unique_count": 50,
+  "command_step_count": 6,
+  "tau_values": [
+    60
+  ],
+  "window_values_s": [
+    360
+  ],
+  "charger_sample_values_s": [
+    5
+  ],
+  "ev_sample_values_s": [
+    30
+  ],
+  "matcher_delay_max_values_s": [
+    10.0
+  ],
+  "candidate_margin_values_s": [
+    120
+  ],
+  "trace_level": "summary",
+  "algorithm_ids": [
+    "single_only",
+    "single_only_dtw_off",
+    "single_only_step_off",
+    "single_only_all_off",
+    "nomura_original_interval_hungarian",
+    "nomura_original_interval_hungarian_dtw_off",
+    "nomura_original_interval_hungarian_corr_off",
+    "nomura_original_interval_hungarian_all_off",
+    "bayesian_windowed",
+    "bayesian_windowed_memory_off",
+    "bayesian_windowed_timeprior_off",
+    "bayesian_windowed_all_off"
+  ],
+  "ingestion_enabled": true,
+  "ev_ingest_delay_mean_s": 2.0,
+  "ev_ingest_delay_jitter_s": 1.0,
+  "ev_ingest_delay_max_s": 10.0,
+  "ev_ingest_loss_prob": 0.005,
+  "simultaneous_arrivals": false,
+  "ev_sensor_extra_delay_max_s": 20,
+  "ev_sensor_gain_std": 0.03,
+  "ev_sensor_bias_std_a": 0.35,
+  "ev_sensor_noise_std_a": 0.2,
+  "ev_start_est_jitter_s": 20,
+  "a3_posterior_prev_power": 0.6,
+  "a3_time_prior_mix": 0.35,
+  "a3_current_like_beta": 1.0,
+  "ev_grid_aggregation": "hold",
+  "response_lag_range_s": null,
+  "response_ramp_range_a_per_s": null,
+  "command_setpoint_range": null
+}

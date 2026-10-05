@@ -1,7 +1,11 @@
-numpy>=1.23
-pandas>=1.5
-scipy>=1.10
-matplotlib>=3.7
-Pillow>=9.5
-pytest>=7.0
-
+# Pinned to the environment the committed results are produced with (Python 3.11.15).
+# The scenario realisation depends on the numpy Generator stream, so reproducing the committed
+# run directories bit-for-bit requires a pinned environment. Verified on 2026-09-06: this set and
+# numpy 2.2.6 / pandas 2.3.2 / scipy 1.15.3 both replay the canonical EV = 100 and EV = 500 cells
+# with identical scenario hashes and identical per-run accuracies.
+numpy==2.4.6
+pandas==3.0.5
+scipy==1.17.1
+matplotlib==3.11.1
+Pillow==12.3.0
+pytest==9.1.1

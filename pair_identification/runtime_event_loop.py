@@ -244,26 +244,75 @@ def _simulate_ingest_times(
     delay_max_s: float,
     loss_prob: float,
     rng: np.random.RandomState,
+    measurement_period_s: int = 0,
 ) -> pd.DatetimeIndex:
+    """Ingestion times of the EV grid points, with one draw per EV measurement.
+
+    The grid is finer than the EV telemetry: at a sampling period of ``measurement_period_s`` each
+    measurement is held on several grid points. Transport applies to the measurement, not to its
+    copies, so one delay and one loss are drawn per measurement and every copy inherits them: a
+    copy at time ``t`` of the measurement taken at ``t_k`` becomes available at
+    ``max(t, t_k + d_k)`` — a held value is known once the measurement has arrived and the instant
+    it stands for has passed — and the whole measurement is dropped when it is lost, so the causal
+    hold in ``_observed_ev_prefix`` carries the previous measurement forward. With a period equal
+    to the grid step this is one draw per grid point.
+    """
     n = int(len(times))
     if n <= 0:
         return pd.DatetimeIndex([])
 
+    idx = pd.DatetimeIndex(times)
+    period = max(0, int(measurement_period_s))
+    t0 = pd.Timestamp(idx[0])
+    if period <= 0:
+        # no telemetry period given: fall back to one draw per grid point
+        block = np.arange(n, dtype=np.int64)
+        taken = idx.to_numpy(dtype="datetime64[ns]")
+    else:
+        block = ((idx - t0).total_seconds().to_numpy() // period).astype(np.int64)
+        n_meas = int(block.max()) + 1
+        taken = t0.to_datetime64() + (
+            np.arange(n_meas, dtype=np.int64) * period * 1_000_000_000
+        ).astype("timedelta64[ns]")
+    n_meas = int(len(taken))
+
     jitter = max(1e-6, float(delay_jitter_s))
     max_delay = max(0.0, float(delay_max_s))
-    delays = rng.normal(loc=float(delay_mean_s), scale=jitter, size=n)
+    delays = rng.normal(loc=float(delay_mean_s), scale=jitter, size=n_meas)
     delays = np.clip(delays, 0.0, max_delay)
-    ingest = pd.DatetimeIndex(times + pd.to_timedelta(delays, unit="s"))
+
+    published = taken + pd.to_timedelta(delays, unit="s").to_numpy(dtype="timedelta64[ns]")
+    ingest = pd.DatetimeIndex(np.maximum(idx.to_numpy(dtype="datetime64[ns]"), published[block]))
 
     p_loss = float(np.clip(float(loss_prob), 0.0, 1.0))
     if p_loss > 0.0:
-        lost = rng.random(size=n) < p_loss
+        lost_meas = rng.random(size=n_meas) < p_loss
+        lost = lost_meas[block]
         if np.any(lost):
             # copy(): pandas >= 3.0 returns a read-only view from to_numpy()
             arr = ingest.to_numpy(dtype="datetime64[ns]").copy()
             arr[lost] = _LOST_TS.to_datetime64()
             ingest = pd.DatetimeIndex(arr)
     return ingest
+
+
+def _blockify_ingest_times(times: pd.DatetimeIndex, ingest: pd.DatetimeIndex, block_s: int) -> pd.DatetimeIndex:
+    """Block-mean front end (dense-sampling diagnostic): a block's value is available only when its last received
+    sample has been ingested, so every grid point of a block inherits the latest ingestion time
+    among the block's received samples (blocks with no received sample stay lost)."""
+    n = int(len(times))
+    if n == 0:
+        return ingest
+    t0 = pd.Timestamp(times[0])
+    blocks = ((pd.DatetimeIndex(times) - t0).total_seconds() // max(1, int(block_s))).astype(int)
+    arr = pd.DatetimeIndex(ingest).to_numpy(dtype="datetime64[ns]").copy()
+    lost = _LOST_TS.to_datetime64()
+    out = arr.copy()
+    for b in np.unique(blocks):
+        idx = np.where(blocks == b)[0]
+        received = arr[idx][arr[idx] != lost]
+        out[idx] = received.max() if received.size > 0 else lost
+    return pd.DatetimeIndex(out)
 
 
 def _observed_ev_prefix(
@@ -421,8 +470,11 @@ def run_online_active_set(
             delay_max_s=float(cfg.ev_ingest_delay_max_s),
             loss_prob=float(cfg.ev_ingest_loss_prob),
             rng=rng,
+            measurement_period_s=int(getattr(cfg, "ev_measurement_period_s", 0)),
         )
         _accumulate_ingest_stats(ev_ingest_acc, times_5s, ev_ingest_ts)
+        if str(getattr(cfg, "ev_grid_aggregation", "hold")) == "block_mean":
+            ev_ingest_ts = _blockify_ingest_times(times_5s, ev_ingest_ts, int(getattr(cfg, "ev_grid_block_s", 30)))
 
         arrival_ts = pd.Timestamp(ev_meta[ei].get("start_est_ts", ev_meta[ei]["arrival_ts"]))
         session_end_ts = pd.Timestamp(ev_meta[ei].get("session_end_ts", arrival_ts))

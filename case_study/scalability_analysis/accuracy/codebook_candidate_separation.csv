@@ -1,0 +1,25 @@
+algorithm_id,separation_bin,sessions,errors,conditional_error_rate,share_of_sessions
+bayesian_windowed,<= 10,13,1,0.07692307692307693,0.0013
+bayesian_windowed,11-20,4016,73,0.018177290836653388,0.4016
+bayesian_windowed,21-30,5630,86,0.0152753108348135,0.563
+bayesian_windowed,31-40,313,2,0.006389776357827476,0.0313
+bayesian_windowed,> 40,28,0,0.0,0.0028
+bayesian_windowed,all,10000,162,0.0162,1.0
+nomura_original_interval_hungarian,<= 10,13,0,0.0,0.0013
+nomura_original_interval_hungarian,11-20,4016,3,0.000747011952191235,0.4016
+nomura_original_interval_hungarian,21-30,5630,4,0.0007104795737122557,0.563
+nomura_original_interval_hungarian,31-40,313,0,0.0,0.0313
+nomura_original_interval_hungarian,> 40,28,0,0.0,0.0028
+nomura_original_interval_hungarian,all,10000,7,0.0007,1.0
+single_only,<= 10,13,3,0.23076923076923078,0.0013
+single_only,11-20,4016,126,0.03137450199203187,0.4016
+single_only,21-30,5630,135,0.023978685612788632,0.563
+single_only,31-40,313,4,0.012779552715654952,0.0313
+single_only,> 40,28,0,0.0,0.0028
+single_only,all,10000,268,0.0268,1.0
+time_only_baseline,<= 10,13,7,0.5384615384615384,0.0013
+time_only_baseline,11-20,4016,1224,0.3047808764940239,0.4016
+time_only_baseline,21-30,5630,1561,0.27726465364120784,0.563
+time_only_baseline,31-40,313,81,0.25878594249201275,0.0313
+time_only_baseline,> 40,28,6,0.21428571428571427,0.0028
+time_only_baseline,all,10000,2879,0.2879,1.0

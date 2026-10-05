@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate manuscript Figure 6: ablation summary."""
+"""Generate figure file figure6 (manuscript Figure 8): ablation summary."""
 
 from __future__ import annotations
 

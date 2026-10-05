@@ -1,0 +1,68 @@
+% Figure 1 of the manuscript: two-plane observability schematic.
+% Redrawn for the revision with the layout of the submitted figure; the labels use the
+% terminology of the text (slot-unlabeled EV session, EVSE current reference, slot label known).
+% Build: pdflatex figure1_two_plane_observability.tex
+\documentclass[10pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage{times}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc}
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{tikzpicture}
+\setlength\PreviewBorder{1.5pt}
+\pagestyle{empty}
+\begin{document}
+\begin{tikzpicture}[x=1pt,y=1pt,
+  every node/.style={font=\small},
+  box/.style={draw, fill=white, rounded corners=1.5pt, inner sep=3pt, align=center, line width=0.5pt},
+  wide/.style={draw, fill=white, rounded corners=1.5pt, inner xsep=5pt, inner ysep=3pt, align=left, line width=0.5pt},
+  plane/.style={draw=none, fill=black!9, rounded corners=3pt},
+  lbl/.style={font=\footnotesize\itshape, text=black!55, inner sep=1pt},
+  ann/.style={font=\footnotesize\itshape, text=black!65, inner sep=1pt},
+  arr/.style={-{Latex[length=5pt,width=4pt]}, line width=0.6pt},
+  darr/.style={-{Latex[length=5pt,width=4pt]}, line width=0.6pt, dashed, dash pattern=on 3pt off 2pt},
+]
+  % planes
+  \fill[plane] (0,90) rectangle (232,149);
+  \fill[plane] (0,11) rectangle (232,71);
+  \node[lbl, anchor=south west] at (1,149) {Control plane -- console-known reference};
+  \node[lbl, anchor=north west] at (1,11) {Data plane -- cloud-ingested, delayed, slot-unlabeled, lossy};
+
+  % control plane boxes
+  \node[box] (evse) at (40,119) {EVSE slot\\(AC charger)};
+  \node[wide] (ref) at (152,119) {\textbf{EVSE current reference} $x_s(t)$\\console-direct via OCPP\\\textit{no delay $\cdot$ slot label known}};
+  \draw[arr] (evse) -- (ref);
+
+  % data plane boxes
+  \node[box] (ev) at (40,42) {EV session\\(slot-unlabeled)};
+  \node[wide] (tel) at (152,41) {\textbf{EV telemetry} $y_i(t)$\\coarse sampling $\Delta t_{\text{EV}}$\\sensing distortion\\cloud delay, jitter, loss};
+  \draw[arr] (ev) -- (tel);
+
+  % asymmetry arrow between the planes
+  \draw[{Latex[length=4pt,width=3.5pt]}-{Latex[length=4pt,width=3.5pt]}, line width=0.6pt, black!55] (40,97) -- (40,64);
+  \node[ann, anchor=west, align=left] at (84,80) {observational asymmetry\\(not delay alone)};
+
+  % decision block
+  \node[box, fill=black!6, inner xsep=4pt, line width=0.8pt] (wm) at (350,85) {Watermark\\decision\\$t \geq t_{\text{eff}}{+}d_{\max}$};
+  \node[box] (out) at (427,84) {$\hat m(i)$:\\EV $\rightarrow$ slot};
+  \draw[arr] (wm) -- (out);
+
+  % clean stream: square-wave sketch on the control-plane link
+  \draw[arr] (ref.east) -- ($(wm.west)+(0,12)$);
+  \begin{scope}[shift={(240,118)}]
+    \fill[white] (-1,-1) rectangle (41,13);
+    \draw[line width=0.7pt] (0,0) -- (7,0) -- (7,8) -- (16,8) -- (16,0) -- (23,0) -- (23,11) -- (32,11) -- (32,4) -- (40,4);
+  \end{scope}
+  \node[ann, anchor=north] at (260,108) {clean};
+
+  % sparse, delayed stream: sparse samples on the data-plane link
+  \draw[darr] (tel.east) -- ($(wm.west)+(0,-12)$);
+  \begin{scope}[shift={(240,40)}]
+    \fill[white] (-1,-3) rectangle (41,13);
+    \draw[dashed, dash pattern=on 2pt off 1.5pt, line width=0.6pt] (0,1) -- (40,10);
+    \foreach \x/\y in {1/1, 10/3, 20/5, 29/7, 39/10} {\node[circle, draw, fill=white, inner sep=0pt, minimum size=2.4pt, line width=0.4pt] at (\x,\y) {};}
+  \end{scope}
+  \node[ann, anchor=north] at (260,30) {sparse, delayed};
+\end{tikzpicture}
+\end{document}

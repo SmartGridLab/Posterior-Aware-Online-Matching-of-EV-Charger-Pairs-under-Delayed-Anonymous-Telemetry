@@ -1,9 +1,8 @@
 cff-version: 1.2.0
-title: "Posterior-Aware Online Matching of EV-Charger Pairs (IEEE Access reproducibility archive, v2.1)"
+title: "Watermark-Based Online EV-Charger Matching from Delayed Slot-Unlabeled Telemetry (code and reproducibility archive)"
 message: "If you use this code, please cite the associated paper."
 type: software
-version: "2.1"
-date-released: "2026-06-29"
+date-released: "2026-10-05"
 authors:
   - family-names: Yang
     given-names: Jiseok
@@ -20,7 +19,7 @@ preferred-citation:
       given-names: Jiseok
     - family-names: Kodaira
       given-names: Daisuke
-  title: "Posterior-Aware Online Matching of EV-Charger Pairs under Delayed Anonymous Telemetry"
+  title: "Watermark-Based Online EV-Charger Matching from Delayed Slot-Unlabeled Telemetry"
   journal: "IEEE Access"
   year: 2026
   notes: "Under review."

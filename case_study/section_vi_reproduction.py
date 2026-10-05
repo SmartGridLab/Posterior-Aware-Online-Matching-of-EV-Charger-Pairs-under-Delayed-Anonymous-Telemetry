@@ -55,6 +55,7 @@ from pair_identification import matching_core as algo
 from pair_identification.runtime_bayesian import BayesianWindowedAssigner
 from pair_identification.ingestion_reference import ingestion_reference_payload
 from case_study.site_simulation import (
+    MAX_EVSE_COUNT,
     SimulationParameters,
     override_algo_config,
     override_ingestion_config,
@@ -67,7 +68,7 @@ DEFAULT_REPEATS = 10
 MAX_REPEATS = 50
 DEFAULT_ERROR_MODE = "ci95"
 VALID_ERROR_MODES = {"ci95", "std"}
-FIXED_EVSE_COUNT = 50
+FIXED_EVSE_COUNT = 50  # manuscript default; per-run override via run_algorithm_compare_report(evse_count=...)
 DEFAULT_PATTERN_UNIQUE_COUNT = FIXED_EVSE_COUNT
 MIN_PATTERN_UNIQUE_COUNT = 1
 MAX_PATTERN_UNIQUE_COUNT = FIXED_EVSE_COUNT
@@ -141,6 +142,26 @@ class ExperimentConfig:
     ev_ingest_delay_jitter_s: float
     ev_ingest_delay_max_s: float
     ev_ingest_loss_prob: float
+    # The arrival model and the EV sensing-distortion model are recorded explicitly so
+    # config.json / config_hash identify the operating point.
+    simultaneous_arrivals: bool
+    ev_sensor_extra_delay_max_s: int
+    ev_sensor_gain_std: float
+    ev_sensor_bias_std_a: float
+    ev_sensor_noise_std_a: float
+    ev_start_est_jitter_s: int
+    # Hyperparameter sensitivity: effective A3 hyperparameters of the run (TABLE 2 symbols
+    # gamma_prev, eta_mix, beta_curr); module defaults unless overridden per run.
+    a3_posterior_prev_power: float
+    a3_time_prior_mix: float
+    a3_current_like_beta: float
+    # Dense-sampling diagnostic: EV-grid front end, "hold" (manuscript) or "block_mean".
+    ev_grid_aggregation: str
+    # Response heterogeneity: per-session response heterogeneity ranges (None = fitted model).
+    response_lag_range_s: list[float] | None
+    response_ramp_range_a_per_s: list[float] | None
+    # Codebook band sweep: command set-point band of the codebook generator (None = canonical 6–30 A).
+    command_setpoint_range: list[int] | None
 
 
 ALGO_SPECS: list[AlgoSpec] = [
@@ -217,6 +238,25 @@ EXTRA_ALGO_SPECS: list[AlgoSpec] = [
         description="A3 variant with timing-prior influence removed.",
         is_current=False,
     ),
+    # Stateless two-prefix controls: two-prefix evidence without any posterior state.
+    AlgoSpec(
+        id="two_prefix_greedy",
+        label="A1+) Two-Prefix Refined Cost + Greedy 1:1",
+        description=(
+            "Refined waveform cost evaluated on the 60 % and 100 % matured-prefix stages (the two A3 "
+            "update stages) and averaged, no posterior carry-over, greedy unique 1:1 assignment."
+        ),
+        is_current=False,
+    ),
+    AlgoSpec(
+        id="two_prefix_hungarian",
+        label="A1++) Two-Prefix Refined Cost + Hungarian",
+        description=(
+            "Refined waveform cost averaged over the 60 % and 100 % matured-prefix stages, no posterior "
+            "carry-over, dense global 1:1 Hungarian assignment on the matured batch."
+        ),
+        is_current=False,
+    ),
     AlgoSpec(
         id="bayesian_windowed_all_off",
         label="A3 Ablation) Time Prior + Memory Off",
@@ -238,6 +278,8 @@ PAPER_ABLATION_ALGORITHM_IDS = [
     "single_only_dtw_off",
     "single_only_step_off",
     "single_only_all_off",
+    "two_prefix_greedy",
+    "two_prefix_hungarian",
     "nomura_original_interval_hungarian",
     "nomura_original_interval_hungarian_dtw_off",
     "nomura_original_interval_hungarian_corr_off",
@@ -248,7 +290,14 @@ PAPER_ABLATION_ALGORITHM_IDS = [
     "bayesian_windowed_all_off",
 ]
 PAPER_ABLATION_FAMILIES: dict[str, list[str]] = {
-    "A1": ["single_only", "single_only_dtw_off", "single_only_step_off", "single_only_all_off"],
+    "A1": [
+        "single_only",
+        "single_only_dtw_off",
+        "single_only_step_off",
+        "single_only_all_off",
+        "two_prefix_greedy",
+        "two_prefix_hungarian",
+    ],
     "A2": [
         "nomura_original_interval_hungarian",
         "nomura_original_interval_hungarian_dtw_off",
@@ -271,6 +320,8 @@ _PAPER_ALGO_COLORS: dict[str, str] = {
     "single_only_step_off": "#0ea5e9",
     "single_only_dtw_off": "#0284c7",
     "single_only_all_off": "#0369a1",
+    "two_prefix_greedy": "#0891b2",
+    "two_prefix_hungarian": "#155e75",
     "nomura_original_interval_hungarian_dtw_off": "#14b8a6",
     "nomura_original_interval_hungarian_corr_off": "#10b981",
     "nomura_original_interval_hungarian_all_off": "#059669",
@@ -347,6 +398,8 @@ def _paper_algo_short_label(aid: str) -> str:
         "single_only_step_off": "A1-step off",
         "single_only_dtw_off": "A1-DTW off",
         "single_only_all_off": "A1-all off",
+        "two_prefix_greedy": "A1-two-prefix greedy",
+        "two_prefix_hungarian": "A1-two-prefix Hungarian",
         "nomura_original_interval_hungarian": "A2",
         "nomura_original_interval_hungarian_dtw_off": "A2-DTW off",
         "nomura_original_interval_hungarian_corr_off": "A2-corr off",
@@ -368,6 +421,15 @@ def _validate_repeats(value: int) -> int:
         raise ValueError("repeats must be positive")
     if n > MAX_REPEATS:
         raise ValueError(f"repeats is too large (max {MAX_REPEATS})")
+    return n
+
+
+def _validate_evse_count(value: int) -> int:
+    n = int(value)
+    if n <= 0:
+        raise ValueError("evse_count must be positive")
+    if n > MAX_EVSE_COUNT:
+        raise ValueError(f"evse_count is too large (max {MAX_EVSE_COUNT})")
     return n
 
 
@@ -513,6 +575,62 @@ def _validate_ingestion_inputs(
         "ev_ingest_delay_max_s": float(max_delay),
         "ev_ingest_loss_prob": float(loss),
     }
+
+
+_SENSOR_MODEL_GLOBALS: dict[str, str] = {
+    # kwarg name -> matching_core module global (env EVLINK_* at import time)
+    "ev_sensor_extra_delay_max_s": "EV_SENSOR_EXTRA_DELAY_MAX_S",
+    "ev_sensor_gain_std": "EV_SENSOR_GAIN_STD",
+    "ev_sensor_bias_std_a": "EV_SENSOR_BIAS_STD_A",
+    "ev_sensor_noise_std_a": "EV_SENSOR_NOISE_STD_A",
+    "ev_start_est_jitter_s": "EV_START_EST_JITTER_S",
+}
+_SENSOR_MODEL_INT_KEYS = {"ev_sensor_extra_delay_max_s", "ev_start_est_jitter_s"}
+_A3_HYPERPARAM_GLOBALS: dict[str, str] = {
+    # kwarg name -> matching_core module global (TABLE 2: gamma_prev, eta_mix, beta_curr)
+    "a3_posterior_prev_power": "POSTERIOR_PREV_POWER",
+    "a3_time_prior_mix": "TIME_PRIOR_MIX",
+    "a3_current_like_beta": "CURRENT_LIKE_BETA",
+}
+
+
+def _resolve_a3_hyperparams(**overrides: float | None) -> dict[str, float]:
+    """Effective A3 hyperparameters for one compare run (``None`` keeps the TABLE 2 module value)."""
+    out: dict[str, float] = {}
+    for key, attr in _A3_HYPERPARAM_GLOBALS.items():
+        raw = overrides.get(key)
+        val = float(getattr(algo, attr) if raw is None else raw)
+        if val < 0.0:
+            raise ValueError(f"{key} must be >= 0")
+        out[key] = val
+    unknown = sorted(set(overrides) - set(_A3_HYPERPARAM_GLOBALS))
+    if unknown:
+        raise ValueError(f"Unknown A3 hyperparameter(s): {unknown}")
+    return out
+
+
+def _resolve_sensor_model(**overrides: float | int | None) -> dict[str, float | int]:
+    """Effective EV sensing-distortion parameters for one compare run.
+
+    ``None`` keeps the module default (the manuscript's Section V-A sensing layer); an explicit
+    value replaces it for the duration of the run (see ``_override_sensor_model``).
+    """
+    out: dict[str, float | int] = {}
+    for key, attr in _SENSOR_MODEL_GLOBALS.items():
+        raw = overrides.get(key)
+        if raw is None:
+            raw = getattr(algo, attr)
+        if key in _SENSOR_MODEL_INT_KEYS:
+            val: float | int = int(raw)
+        else:
+            val = float(raw)
+        if float(val) < 0.0:
+            raise ValueError(f"{key} must be >= 0")
+        out[key] = val
+    unknown = sorted(set(overrides) - set(_SENSOR_MODEL_GLOBALS))
+    if unknown:
+        raise ValueError(f"Unknown sensor-model parameter(s): {unknown}")
+    return out
 
 
 def list_available_algorithms() -> list[dict[str, Any]]:
@@ -910,6 +1028,111 @@ def _override_candidate_margin(candidate_margin_s: int):
 
 
 @contextmanager
+def _override_sensor_model(sensor_cfg: dict[str, float | int]):
+    """Temporarily apply the resolved EV sensing-distortion parameters to the algo module."""
+    old_values: dict[str, Any] = {}
+    for key, attr in _SENSOR_MODEL_GLOBALS.items():
+        old_values[attr] = getattr(algo, attr)
+        setattr(algo, attr, sensor_cfg[key])
+    try:
+        yield
+    finally:
+        for attr, value in old_values.items():
+            setattr(algo, attr, value)
+
+
+@contextmanager
+def _override_a3_hyperparams(a3_cfg: dict[str, float]):
+    """Temporarily apply the resolved A3 hyperparameters to the algo module globals that
+    ``_build_bayesian_assigner`` reads (the sanctioned per-run path; TABLE 2 values by default)."""
+    old_values: dict[str, Any] = {}
+    for key, attr in _A3_HYPERPARAM_GLOBALS.items():
+        old_values[attr] = getattr(algo, attr)
+        setattr(algo, attr, float(a3_cfg[key]))
+    try:
+        yield
+    finally:
+        for attr, value in old_values.items():
+            setattr(algo, attr, value)
+
+
+VALID_EV_GRID_AGGREGATIONS = {"hold", "block_mean"}
+
+
+@contextmanager
+def _override_ev_grid_aggregation(mode: str):
+    """Temporarily select the EV-grid front end read by matching_core._build_ev_grid_for_match."""
+    old = getattr(algo, "EV_GRID_AGGREGATION", "hold")
+    algo.EV_GRID_AGGREGATION = str(mode)
+    try:
+        yield
+    finally:
+        algo.EV_GRID_AGGREGATION = old
+
+
+def _validate_range(values, *, field: str) -> list[float] | None:
+    if values is None:
+        return None
+    try:
+        lo, hi = float(values[0]), float(values[1])
+    except Exception as exc:
+        raise ValueError(f"{field} must be a (low, high) pair") from exc
+    if lo < 0.0 or hi < lo:
+        raise ValueError(f"{field} must satisfy 0 <= low <= high")
+    return [lo, hi]
+
+
+@contextmanager
+def _override_response_model(lag_range: list[float] | None, ramp_range: list[float] | None):
+    """Temporarily set the per-session response-heterogeneity ranges read by build_dataset_with_random_arrivals."""
+    old = (algo.RESPONSE_LAG_RANGE_S, algo.RESPONSE_RAMP_RANGE_A_PER_S)
+    algo.RESPONSE_LAG_RANGE_S = None if lag_range is None else (float(lag_range[0]), float(lag_range[1]))
+    algo.RESPONSE_RAMP_RANGE_A_PER_S = None if ramp_range is None else (float(ramp_range[0]), float(ramp_range[1]))
+    try:
+        yield
+    finally:
+        algo.RESPONSE_LAG_RANGE_S, algo.RESPONSE_RAMP_RANGE_A_PER_S = old
+
+
+@contextmanager
+def _override_codebook_setpoint_range(setpoint_range: list[int] | None):
+    """Temporarily set the command set-point band read by build_dataset_with_random_arrivals (codebook band sweep)."""
+    old = tuple(algo.COMMAND_SETPOINT_RANGE)
+    algo.COMMAND_SETPOINT_RANGE = old if setpoint_range is None else (int(setpoint_range[0]), int(setpoint_range[1]))
+    try:
+        yield
+    finally:
+        algo.COMMAND_SETPOINT_RANGE = old
+
+
+def _validate_setpoint_range(values, *, field: str = "command_setpoint_range") -> list[int] | None:
+    if values is None:
+        return None
+    try:
+        lo, hi = int(values[0]), int(values[1])
+    except (TypeError, ValueError, IndexError) as exc:
+        raise ValueError(f"{field} must be a (lo, hi) pair of integer amperes") from exc
+    if lo < 1 or hi <= lo or (hi - lo + 1) < 5:
+        raise ValueError(f"{field} must span at least five integer set-points >= 1 A (got {(lo, hi)})")
+    return [lo, hi]
+
+
+@contextmanager
+def _override_run_globals(sensor_cfg: dict[str, float | int], a3_cfg: dict[str, float], ev_grid_aggregation: str, response_lag_range: list[float] | None = None, response_ramp_range: list[float] | None = None, command_setpoint_range: list[int] | None = None):
+    """All per-run module overrides in one context (keeps the compiler's
+    static block nesting of the grid loop unchanged)."""
+    from contextlib import ExitStack
+
+    with ExitStack() as stack:
+        stack.enter_context(_override_sensor_model(sensor_cfg))
+        stack.enter_context(_override_a3_hyperparams(a3_cfg))
+        stack.enter_context(_override_ev_grid_aggregation(ev_grid_aggregation))
+        stack.enter_context(_override_response_model(response_lag_range, response_ramp_range))
+        stack.enter_context(_override_codebook_setpoint_range(command_setpoint_range))
+        yield
+
+
+@contextmanager
 def _override_mcct_timing(tau_seconds: int, command_step_count: int):
     old_tau = int(algo.TAU)
     old_steps = int(algo.N_STEPS)
@@ -1188,6 +1411,164 @@ def _online_assign_single_only(
     return assigned_by_row, row_costs
 
 
+TWO_PREFIX_STAGE_RATIOS: tuple[float, ...] = (0.60, 1.00)
+
+
+def _two_prefix_row_costs(
+    *,
+    ev_rows_pref: list[np.ndarray],
+    row_slot_pref: list[dict[int, np.ndarray]],
+    slots_list: list[int],
+    candidate_slots_by_row: list[list[int]],
+    previous_slot_by_row: dict[int, int],
+    cfg: Any,
+    refined_cost_fn: Callable[[np.ndarray, np.ndarray], float],
+    stage_ratios: tuple[float, ...] = TWO_PREFIX_STAGE_RATIOS,
+) -> tuple[dict[int, dict[int, float]], dict[int, dict[int, dict[str, Any]]]]:
+    """Per-(row, candidate) refined cost averaged over the A3 stage prefixes, no posterior state.
+
+    Stateless control for the two-stage posterior. The prefix rule is identical to
+    ``runtime_bayesian.BayesianWindowedAssigner._stage_cost_map``: stage k uses the first
+    ``max(min_shared_points, round(ratio_k * n))`` grid points of the matured prefix, so the
+    two stages see exactly the data the Posterior matcher sees at its 60 % and 100 % updates.
+    A candidate whose cost is non-finite at any stage is dropped for that row (as A1 drops
+    non-finite costs); the switch penalty and the deterministic tie-break follow A1.
+    """
+    n_rows = len(ev_rows_pref)
+    slot_to_col = {int(slot): int(cj) for cj, slot in enumerate(slots_list)}
+    min_shared = max(1, int(getattr(cfg, "min_shared_points", 1)))
+    row_costs: dict[int, dict[int, float]] = {int(ri): {} for ri in range(n_rows)}
+    row_details: dict[int, dict[int, dict[str, Any]]] = {int(ri): {} for ri in range(n_rows)}
+
+    for ri in range(n_rows):
+        prev_slot = previous_slot_by_row.get(int(ri))
+        candidates = [int(s) for s in candidate_slots_by_row[ri] if int(s) in slot_to_col]
+        if len(candidates) == 0:
+            candidates = [int(s) for s in slots_list]
+        e_obs = np.asarray(ev_rows_pref[ri], dtype=np.float64)
+        n = int(len(e_obs))
+        cut_lengths: list[int] = []
+        for ratio in stage_ratios:
+            use_n = max(int(min_shared), int(round(float(ratio) * float(n))))
+            cut_lengths.append(max(1, min(use_n, n)))
+        costs: dict[int, float] = {}
+
+        for slot in candidates:
+            s_obs_raw = row_slot_pref[ri].get(int(slot))
+            if s_obs_raw is None:
+                continue
+            s_obs = np.asarray(s_obs_raw, dtype=np.float64)
+            stage_costs: list[float] = []
+            for use_n in cut_lengths:
+                e_cut = np.asarray(e_obs[:use_n], dtype=np.float64)
+                s_cut = np.asarray(s_obs[:use_n], dtype=np.float64)
+                mask = np.isfinite(e_cut) & np.isfinite(s_cut)
+                if int(np.sum(mask)) < int(min_shared):
+                    stage_costs = []
+                    break
+                c = float(refined_cost_fn(e_cut, s_cut))
+                if not np.isfinite(c):
+                    stage_costs = []
+                    break
+                stage_costs.append(c)
+            if len(stage_costs) != len(cut_lengths):
+                continue
+            cost = float(np.mean(stage_costs))
+            if prev_slot is not None and int(prev_slot) != int(slot):
+                cost += float(cfg.switch_penalty)
+            cj = slot_to_col[int(slot)]
+            cost = float(cost + 1e-6 * (ri + 0.01 * cj))
+            costs[int(slot)] = cost
+            terms = _refined_term_decomposition(e_obs, s_obs, min_shared_points=min_shared)
+            row_details[int(ri)][int(slot)] = {
+                "time_prior_cost": float("nan"),
+                "dtw_term": float(terms.get("dtw_term", float("nan"))),
+                "corr_term": float(terms.get("corr_term", float("nan"))),
+                "step_signature_term": float(terms.get("step_signature_term", float("nan"))),
+                "posterior": float("nan"),
+                "stage_costs": [float(x) for x in stage_costs],
+                "final_assignment_cost": float(cost),
+            }
+        row_costs[int(ri)] = costs
+    return row_costs, row_details
+
+
+def _online_assign_two_prefix_greedy(
+    *,
+    ev_rows_pref: list[np.ndarray],
+    row_slot_pref: list[dict[int, np.ndarray]],
+    slots_list: list[int],
+    candidate_slots_by_row: list[list[int]],
+    time_costs_by_row: list[dict[int, float]] | None = None,
+    previous_slot_by_row: dict[int, int],
+    cfg: Any,
+    refined_cost_fn: Callable[[np.ndarray, np.ndarray], float],
+    **_kwargs: Any,
+) -> tuple[dict[int, tuple[int, float]], dict[int, dict[int, float]]]:
+    """Two-prefix averaged refined cost + greedy unique 1:1 (stateless control)."""
+    del time_costs_by_row
+    row_costs, row_details = _two_prefix_row_costs(
+        ev_rows_pref=ev_rows_pref,
+        row_slot_pref=row_slot_pref,
+        slots_list=slots_list,
+        candidate_slots_by_row=candidate_slots_by_row,
+        previous_slot_by_row=previous_slot_by_row,
+        cfg=cfg,
+        refined_cost_fn=refined_cost_fn,
+    )
+    assigned_by_row = _greedy_unique_assign_from_row_costs(row_costs, candidate_slots_by_row, slots_list)
+    _online_assign_two_prefix_greedy.last_row_details = row_details
+    _online_assign_two_prefix_greedy.last_row_states = {}
+    return assigned_by_row, row_costs
+
+
+def _online_assign_two_prefix_hungarian(
+    *,
+    ev_rows_pref: list[np.ndarray],
+    row_slot_pref: list[dict[int, np.ndarray]],
+    slots_list: list[int],
+    candidate_slots_by_row: list[list[int]],
+    time_costs_by_row: list[dict[int, float]] | None = None,
+    previous_slot_by_row: dict[int, int],
+    cfg: Any,
+    refined_cost_fn: Callable[[np.ndarray, np.ndarray], float],
+    **_kwargs: Any,
+) -> tuple[dict[int, tuple[int, float]], dict[int, dict[int, float]]]:
+    """Two-prefix averaged refined cost + dense global Hungarian (stateless control)."""
+    del time_costs_by_row
+    row_costs, row_details = _two_prefix_row_costs(
+        ev_rows_pref=ev_rows_pref,
+        row_slot_pref=row_slot_pref,
+        slots_list=slots_list,
+        candidate_slots_by_row=candidate_slots_by_row,
+        previous_slot_by_row=previous_slot_by_row,
+        cfg=cfg,
+        refined_cost_fn=refined_cost_fn,
+    )
+    n_rows = len(ev_rows_pref)
+    n_cols = len(slots_list)
+    slot_to_col = {int(slot): int(cj) for cj, slot in enumerate(slots_list)}
+    cost_matrix = np.full((n_rows, n_cols), np.inf, dtype=np.float64)
+    for ri, costs in row_costs.items():
+        for slot, cost in costs.items():
+            cost_matrix[int(ri), slot_to_col[int(slot)]] = float(cost)
+    assigned_by_row: dict[int, tuple[int, float]] = {}
+    if n_rows > 0 and n_cols > 0:
+        valid_mask = np.isfinite(cost_matrix)
+        _dense, row_ind, col_ind = _hungarian_with_inf_penalty(cost_matrix, float(cfg.switch_penalty))
+        for r, c in zip(row_ind, col_ind):
+            ri = int(r)
+            cj = int(c)
+            slot = int(slots_list[cj])
+            if not bool(valid_mask[ri, cj]):
+                assigned_by_row[ri] = (slot, float("inf"))
+                continue
+            assigned_by_row[ri] = (slot, float(cost_matrix[ri, cj]))
+    _online_assign_two_prefix_hungarian.last_row_details = row_details
+    _online_assign_two_prefix_hungarian.last_row_states = {}
+    return assigned_by_row, row_costs
+
+
 def _online_assign_time_only_baseline(
     *,
     ev_rows_pref: list[np.ndarray],
@@ -1460,6 +1841,12 @@ def _run_one_algorithm(
     elif algo_key == "single_only_all_off":
         assignment_fn = _online_assign_time_only_baseline
         refined_cost_fn = algo._refined_cost_from_grids
+    elif algo_key == "two_prefix_greedy":
+        assignment_fn = _online_assign_two_prefix_greedy
+        refined_cost_fn = algo._refined_cost_from_grids
+    elif algo_key == "two_prefix_hungarian":
+        assignment_fn = _online_assign_two_prefix_hungarian
+        refined_cost_fn = algo._refined_cost_from_grids
     elif algo_key == "nomura_original_interval_hungarian":
         assignment_fn = _online_assign_nomura_original_hungarian
         refined_cost_fn = algo._refined_cost_from_grids
@@ -1621,6 +2008,59 @@ def _derive_algo_seed(seed: int, algo_id: str) -> int:
     digest = hashlib.sha256(str(algo_id).encode("utf-8")).digest()
     algo_part = int.from_bytes(digest[:4], "little", signed=False)
     return int((int(seed) ^ int(algo_part)) & 0xFFFFFFFF)
+
+
+def _pattern_to_str(pattern: Any) -> str:
+    try:
+        return "|".join(str(int(x)) for x in list(pattern))
+    except Exception:
+        return str(pattern)
+
+
+def _export_ev_meta_rows(ev_meta: list[dict[str, Any]], common: dict[str, Any]) -> list[dict[str, Any]]:
+    """Per-session metadata export for full-trace runs (failure taxonomy).
+
+    One row per admitted EV session: ground-truth slot, true arrival, EV-side start estimate,
+    session end, the session's MCCT pattern and the realised sensing-distortion draws
+    (extra sampling delay, gain, bias, noise std) from ``build_dataset_with_random_arrivals``.
+    """
+    rows: list[dict[str, Any]] = []
+    for meta in ev_meta:
+        rows.append(
+            {
+                **common,
+                "ev_idx": int(meta.get("ev_idx", -1)),
+                "ev_token": str(meta.get("token", "")),
+                "gt_slot": int(meta.get("evse_idx_gt", -1)),
+                "arrival_ts": pd.Timestamp(meta["arrival_ts"]).isoformat(),
+                "start_est_ts": pd.Timestamp(meta.get("start_est_ts", meta["arrival_ts"])).isoformat(),
+                "session_end_ts": pd.Timestamp(meta.get("session_end_ts", meta["arrival_ts"])).isoformat(),
+                "session_len_s": int(meta.get("session_len_s", 0)),
+                "pattern": _pattern_to_str(meta.get("pattern", [])),
+                "ev_sensor_delay_s": int(meta.get("ev_sensor_delay_s", 0)),
+                "ev_sensor_gain": float(meta.get("ev_sensor_gain", 1.0)),
+                "ev_sensor_bias_a": float(meta.get("ev_sensor_bias_a", 0.0)),
+                "ev_sensor_noise_std_a": float(meta.get("ev_sensor_noise_std_a", 0.0)),
+            }
+        )
+    return rows
+
+
+def _export_slot_session_rows(sessions_by_slot: dict[int, list[dict[str, Any]]], common: dict[str, Any]) -> list[dict[str, Any]]:
+    """Slot-side session intervals and patterns for full-trace runs (the reference plane)."""
+    rows: list[dict[str, Any]] = []
+    for slot, sessions in sorted(sessions_by_slot.items()):
+        for s in sessions:
+            rows.append(
+                {
+                    **common,
+                    "slot": int(slot),
+                    "start_ts": pd.Timestamp(s["start_ts"]).isoformat(),
+                    "end_ts": pd.Timestamp(s["end_ts"]).isoformat(),
+                    "pattern": _pattern_to_str(s.get("pattern", [])),
+                }
+            )
+    return rows
 
 
 def _scenario_signature_hash(
@@ -2197,9 +2637,43 @@ def run_algorithm_compare_report(
     candidate_margin_values_s: list[int] | None = None,
     trace_level: str = "full",
     progress_cb: Callable[[dict[str, Any]], None] | None = None,
+    evse_count: int = FIXED_EVSE_COUNT,
+    simultaneous_arrivals: bool = False,
+    ev_sensor_extra_delay_max_s: int | None = None,
+    ev_sensor_gain_std: float | None = None,
+    ev_sensor_bias_std_a: float | None = None,
+    ev_sensor_noise_std_a: float | None = None,
+    ev_start_est_jitter_s: int | None = None,
+    a3_posterior_prev_power: float | None = None,
+    a3_time_prior_mix: float | None = None,
+    a3_current_like_beta: float | None = None,
+    ev_grid_aggregation: str = "hold",
+    response_lag_range_s: tuple[float, float] | list[float] | None = None,
+    response_ramp_range_a_per_s: tuple[float, float] | list[float] | None = None,
+    command_setpoint_range: tuple[int, int] | list[int] | None = None,
 ) -> dict[str, Any]:
     ev_counts = _validate_ev_counts(ev_counts)
+    command_setpoint_range = _validate_setpoint_range(command_setpoint_range)
+    response_lag_range_s = _validate_range(response_lag_range_s, field="response_lag_range_s")
+    response_ramp_range_a_per_s = _validate_range(response_ramp_range_a_per_s, field="response_ramp_range_a_per_s")
+    ev_grid_aggregation = str(ev_grid_aggregation).strip().lower()
+    if ev_grid_aggregation not in VALID_EV_GRID_AGGREGATIONS:
+        raise ValueError(f"ev_grid_aggregation must be one of {sorted(VALID_EV_GRID_AGGREGATIONS)}")
     repeats = _validate_repeats(repeats)
+    evse_count = _validate_evse_count(evse_count)
+    simultaneous_arrivals = bool(simultaneous_arrivals)
+    sensor_cfg = _resolve_sensor_model(
+        ev_sensor_extra_delay_max_s=ev_sensor_extra_delay_max_s,
+        ev_sensor_gain_std=ev_sensor_gain_std,
+        ev_sensor_bias_std_a=ev_sensor_bias_std_a,
+        ev_sensor_noise_std_a=ev_sensor_noise_std_a,
+        ev_start_est_jitter_s=ev_start_est_jitter_s,
+    )
+    a3_cfg = _resolve_a3_hyperparams(
+        a3_posterior_prev_power=a3_posterior_prev_power,
+        a3_time_prior_mix=a3_time_prior_mix,
+        a3_current_like_beta=a3_current_like_beta,
+    )
     error_mode = _validate_error_mode(error_mode)
     pattern_mode = _validate_pattern_mode(pattern_mode)
     pattern_assignment_mode = _validate_pattern_assignment_mode(pattern_assignment_mode)
@@ -2294,7 +2768,7 @@ def run_algorithm_compare_report(
         base_seed=int(base_seed),
         repeats=int(repeats),
         ev_counts=[int(x) for x in ev_counts],
-        evse_count=int(FIXED_EVSE_COUNT),
+        evse_count=int(evse_count),
         sim_hours=12.0,
         session_min_minutes=10.0,
         session_max_minutes=60.0,
@@ -2316,6 +2790,19 @@ def run_algorithm_compare_report(
         ev_ingest_delay_jitter_s=float(ingestion_cfg["ev_ingest_delay_jitter_s"]),
         ev_ingest_delay_max_s=float(ingestion_cfg["ev_ingest_delay_max_s"]),
         ev_ingest_loss_prob=float(ingestion_cfg["ev_ingest_loss_prob"]),
+        simultaneous_arrivals=bool(simultaneous_arrivals),
+        ev_sensor_extra_delay_max_s=int(sensor_cfg["ev_sensor_extra_delay_max_s"]),
+        ev_sensor_gain_std=float(sensor_cfg["ev_sensor_gain_std"]),
+        ev_sensor_bias_std_a=float(sensor_cfg["ev_sensor_bias_std_a"]),
+        ev_sensor_noise_std_a=float(sensor_cfg["ev_sensor_noise_std_a"]),
+        ev_start_est_jitter_s=int(sensor_cfg["ev_start_est_jitter_s"]),
+        a3_posterior_prev_power=float(a3_cfg["a3_posterior_prev_power"]),
+        a3_time_prior_mix=float(a3_cfg["a3_time_prior_mix"]),
+        a3_current_like_beta=float(a3_cfg["a3_current_like_beta"]),
+        ev_grid_aggregation=str(ev_grid_aggregation),
+        response_lag_range_s=response_lag_range_s,
+        response_ramp_range_a_per_s=response_ramp_range_a_per_s,
+        command_setpoint_range=command_setpoint_range,
     )
     config_dict = asdict(experiment_cfg)
     config_hash = _sha256_text(_stable_json_dumps(config_dict))
@@ -2336,6 +2823,8 @@ def run_algorithm_compare_report(
             "switch_penalty": float(getattr(algo, "SWITCH_PENALTY", 3.0)),
             "candidate_time_margin_s": int(getattr(algo, "CANDIDATE_TIME_MARGIN_S", 120)),
             "window_watermark_mode": "window_watermark",
+            "ev_grid_aggregation": str(ev_grid_aggregation),
+            "ev_grid_block_s": int(getattr(algo, "EV_GRID_BLOCK_S", 30)),
         },
         "ingestion_effective": {
             "ev_delay_mean_s": float(ingestion_cfg["ev_ingest_delay_mean_s"]),
@@ -2352,18 +2841,22 @@ def run_algorithm_compare_report(
             "refined_step_weight": float(getattr(algo, "REFINED_STEP_WEIGHT", 0.40)),
             "refined_mean_weight": float(getattr(algo, "REFINED_MEAN_WEIGHT", 0.0)),
             "time_prior_alpha": float(getattr(algo, "TIME_PRIOR_ALPHA", 1.0)),
-            "current_like_beta": float(getattr(algo, "CURRENT_LIKE_BETA", 1.0)),
+            "current_like_beta": float(a3_cfg["a3_current_like_beta"]),
             "posterior_eps": float(getattr(algo, "POSTERIOR_EPS", 1e-9)),
-            "time_prior_mix": float(getattr(algo, "TIME_PRIOR_MIX", 0.35)),
-            "posterior_prev_power": float(getattr(algo, "POSTERIOR_PREV_POWER", 0.60)),
+            "time_prior_mix": float(a3_cfg["a3_time_prior_mix"]),
+            "posterior_prev_power": float(a3_cfg["a3_posterior_prev_power"]),
             "current_cost_weight": float(getattr(algo, "CURRENT_COST_WEIGHT", 0.15)),
         },
         "sensor_model": {
-            "ev_sensor_extra_delay_max_s": int(getattr(algo, "EV_SENSOR_EXTRA_DELAY_MAX_S", 0)),
-            "ev_sensor_gain_std": float(getattr(algo, "EV_SENSOR_GAIN_STD", 0.0)),
-            "ev_sensor_bias_std_a": float(getattr(algo, "EV_SENSOR_BIAS_STD_A", 0.0)),
-            "ev_sensor_noise_std_a": float(getattr(algo, "EV_SENSOR_NOISE_STD_A", 0.0)),
-            "ev_start_est_jitter_s": int(getattr(algo, "EV_START_EST_JITTER_S", 0)),
+            "ev_sensor_extra_delay_max_s": int(sensor_cfg["ev_sensor_extra_delay_max_s"]),
+            "ev_sensor_gain_std": float(sensor_cfg["ev_sensor_gain_std"]),
+            "ev_sensor_bias_std_a": float(sensor_cfg["ev_sensor_bias_std_a"]),
+            "ev_sensor_noise_std_a": float(sensor_cfg["ev_sensor_noise_std_a"]),
+            "ev_start_est_jitter_s": int(sensor_cfg["ev_start_est_jitter_s"]),
+        },
+        "scenario": {
+            "evse_count": int(evse_count),
+            "simultaneous_arrivals": bool(simultaneous_arrivals),
         },
     }
     with resolved_config_path.open("w", encoding="utf-8") as f:
@@ -2385,9 +2878,17 @@ def run_algorithm_compare_report(
             "refined_dtw_weight": float(getattr(algo, "REFINED_DTW_WEIGHT", 1.0)),
             "refined_step_weight": float(getattr(algo, "REFINED_STEP_WEIGHT", 0.40)),
             "refined_mean_weight": float(getattr(algo, "REFINED_MEAN_WEIGHT", 0.0)),
-            "ev_sensor_gain_std": float(getattr(algo, "EV_SENSOR_GAIN_STD", 0.0)),
-            "ev_sensor_bias_std_a": float(getattr(algo, "EV_SENSOR_BIAS_STD_A", 0.0)),
-            "ev_sensor_noise_std_a": float(getattr(algo, "EV_SENSOR_NOISE_STD_A", 0.0)),
+            "ev_sensor_gain_std": float(sensor_cfg["ev_sensor_gain_std"]),
+            "ev_sensor_bias_std_a": float(sensor_cfg["ev_sensor_bias_std_a"]),
+            "ev_sensor_noise_std_a": float(sensor_cfg["ev_sensor_noise_std_a"]),
+            "ev_sensor_extra_delay_max_s": int(sensor_cfg["ev_sensor_extra_delay_max_s"]),
+            "ev_start_est_jitter_s": int(sensor_cfg["ev_start_est_jitter_s"]),
+            # response model (Sec. V-A Layer 1, Eqs. 18-19): fitted values or per-session distributions
+            "response_first_step_lag_s": ("U(%g, %g) s per session" % tuple(response_lag_range_s)) if response_lag_range_s else 15.0,
+            "response_step_lag_s": 5.0,
+            "response_rise_rate_a_per_s": ("U(%g, %g) A/s per session" % tuple(response_ramp_range_a_per_s)) if response_ramp_range_a_per_s else "0.0327*delta_u + 0.3787",
+            "response_fall_rate_a_per_s": ("min(4, ramp)" if response_ramp_range_a_per_s else 4.0),
+            "response_offset_a": "0.0221*u + 0.2831",
         },
         "comments": (
             "EVSE side is console-known reference (zero uplink delay/loss in this baseline). "
@@ -2404,9 +2905,11 @@ def run_algorithm_compare_report(
     posterior_trace_rows: list[dict[str, Any]] = []
     posterior_checkpoint_trace_rows: list[dict[str, Any]] = []
     blocked_rows: list[dict[str, Any]] = []
+    ev_meta_rows: list[dict[str, Any]] = []
+    slot_session_rows: list[dict[str, Any]] = []
     params = SimulationParameters(
         ev_count=1,
-        evse_count=FIXED_EVSE_COUNT,
+        evse_count=int(evse_count),
         sim_hours=12.0,
         session_min_minutes=10.0,
         session_max_minutes=60.0,
@@ -2426,7 +2929,7 @@ def run_algorithm_compare_report(
 
     try:
         _emit_progress("prepare", "Initializing compare run")
-        with simulation_lock:
+        with simulation_lock, _override_run_globals(sensor_cfg, a3_cfg, ev_grid_aggregation, response_lag_range_s, response_ramp_range_a_per_s, command_setpoint_range):
             with _silence_algo_logs():
                 for tau_s in tau_values:
                     for mode in pattern_modes:
@@ -2474,9 +2977,27 @@ def run_algorithm_compare_report(
                                                                         tau=algo.TAU,
                                                                         window=algo.WINDOW,
                                                                         arrival_span_max=params.arrival_span_max,
+                                                                        arrival_schedule_sec=([0] * int(params.ev_count)) if simultaneous_arrivals else None,
                                                                         slot_fixed_patterns=slot_fixed_patterns,
                                                                     )
                                                                     scenario_hash = _scenario_signature_hash(ev_meta, sessions_by_slot)
+                                                                    if trace_mode == "full":
+                                                                        _scenario_common = {
+                                                                            "run_id": str(tag),
+                                                                            "scenario_id": int(scenario_id),
+                                                                            "scenario_seed": int(seed),
+                                                                            "repeat_idx": int(rep + 1),
+                                                                            "ev_count": int(ev_count),
+                                                                            "evse_count": int(evse_count),
+                                                                            "tau_s": int(tau_s),
+                                                                            "ev_sample_s": int(ev_sample_s),
+                                                                            "matcher_delay_max_s": float(matcher_delay_max_s),
+                                                                            "candidate_margin_s": int(candidate_margin_s),
+                                                                            "pattern_mode": str(mode),
+                                                                            "pattern_assignment_mode": str(pattern_assignment_mode),
+                                                                        }
+                                                                        ev_meta_rows.extend(_export_ev_meta_rows(ev_meta, _scenario_common))
+                                                                        slot_session_rows.extend(_export_slot_session_rows(sessions_by_slot, _scenario_common))
                                                                     if isinstance(dataset_diag, dict):
                                                                         blocked_items = dataset_diag.get("blocked_sessions", [])
                                                                         if isinstance(blocked_items, list):
@@ -2496,7 +3017,7 @@ def run_algorithm_compare_report(
                                                                                         "matcher_delay_max_s": float(matcher_delay_max_s),
                                                                                         "candidate_margin_s": int(candidate_margin_s),
                                                                                         "ev_count": int(ev_count),
-                                                                                        "evse_count": int(FIXED_EVSE_COUNT),
+                                                                                        "evse_count": int(evse_count),
                                                                                         "pattern_mode": str(mode),
                                                                                         "pattern_assignment_mode": str(pattern_assignment_mode),
                                                                                         "request_idx": int(b.get("request_idx", -1)),
@@ -2582,7 +3103,7 @@ def run_algorithm_compare_report(
                                                                             "algo_seed": int(algo_seed),
                                                                             "repeat_idx": int(rep + 1),
                                                                             "ev_count": int(ev_count),
-                                                                            "evse_count": int(FIXED_EVSE_COUNT),
+                                                                            "evse_count": int(evse_count),
                                                                             "tau_s": int(tau_s),
                                                                             "charger_sample_s": int(charger_sample_s),
                                                                             "ev_sample_s": int(ev_sample_s),
@@ -2629,7 +3150,7 @@ def run_algorithm_compare_report(
                                                                                 "seed": int(seed),
                                                                                 "repeat_idx": int(rep + 1),
                                                                                 "ev_count": int(ev_count),
-                                                                                "evse_count": FIXED_EVSE_COUNT,
+                                                                                "evse_count": int(evse_count),
                                                                                 "tau_s": int(tau_s),
                                                                                 "charger_sample_s": int(charger_sample_s),
                                                                                 "ev_sample_s": int(ev_sample_s),
@@ -2643,6 +3164,8 @@ def run_algorithm_compare_report(
                                                                                 "command_step_count": int(command_step_count),
                                                                                 "window_s": int(algo.WINDOW),
                                                                                 "scenario_hash": str(scenario_hash),
+                                                                                **{f"response_{k}": float(v) for k, v in (dataset_diag.get("response_heterogeneity", {}) if isinstance(dataset_diag, dict) else {}).items() if k != "sessions"},
+                                                                                **{f"codebook_{k}": v for k, v in (dataset_diag.get("codebook", {}) if isinstance(dataset_diag, dict) else {}).items()},
                                                                                 "ingest_seed": int(ingest_seed),
                                                                                 "ingestion_signature_sha256": str(ingestion_sig),
                                                                                 "ingestion_signature_match_ref": bool(ingest_match_ref),
@@ -2716,6 +3239,8 @@ def run_algorithm_compare_report(
     p_posterior_trace_parquet = out_dir / "posterior_trace_A3.parquet"
     p_posterior_checkpoint_jsonl = out_dir / "posterior_checkpoint_trace_A3.jsonl"
     p_blocked_csv = out_dir / "blocked_sessions.csv"
+    p_ev_meta_csv = out_dir / "ev_meta.csv"
+    p_slot_sessions_csv = out_dir / "slot_sessions.csv"
     p_pres_acc = out_dir / "presentation_accuracy_vs_ev_ci95.csv"
     p_pres_lat = out_dir / "presentation_p90_latency_vs_ev_ci95.csv"
     p_pres_runtime = out_dir / "presentation_runtime_vs_ev_ci95.csv"
@@ -2729,7 +3254,7 @@ def run_algorithm_compare_report(
         selected_algo_specs,
         metric_prefix="accuracy",
         y_label="Accuracy (%)",
-        title=f"Algorithm Accuracy vs EV Count (EVSE={FIXED_EVSE_COUNT}, repeats={repeats})",
+        title=f"Algorithm Accuracy vs EV Count (EVSE={int(evse_count)}, repeats={repeats})",
         out_path=p_acc,
         error_mode=error_mode,
         scale=100.0,
@@ -2742,7 +3267,7 @@ def run_algorithm_compare_report(
         selected_algo_specs,
         metric_prefix="p90_latency",
         y_label="P90 Latency (s)",
-        title=f"Algorithm P90 Latency vs EV Count (EVSE={FIXED_EVSE_COUNT}, repeats={repeats})",
+        title=f"Algorithm P90 Latency vs EV Count (EVSE={int(evse_count)}, repeats={repeats})",
         out_path=p_lat,
         error_mode=error_mode,
         scale=1.0,
@@ -2755,7 +3280,7 @@ def run_algorithm_compare_report(
         selected_algo_specs,
         metric_prefix="avg_cost",
         y_label="Average Matching Cost",
-        title=f"Algorithm Average Cost vs EV Count (EVSE={FIXED_EVSE_COUNT}, repeats={repeats})",
+        title=f"Algorithm Average Cost vs EV Count (EVSE={int(evse_count)}, repeats={repeats})",
         out_path=p_cost,
         error_mode=error_mode,
         scale=1.0,
@@ -2768,7 +3293,7 @@ def run_algorithm_compare_report(
         selected_algo_specs,
         metric_prefix="assignment_runtime",
         y_label="Assignment Runtime (s)",
-        title=f"Algorithm Runtime vs EV Count (EVSE={FIXED_EVSE_COUNT}, repeats={repeats})",
+        title=f"Algorithm Runtime vs EV Count (EVSE={int(evse_count)}, repeats={repeats})",
         out_path=p_runtime,
         error_mode=error_mode,
         scale=1.0,
@@ -2782,6 +3307,9 @@ def run_algorithm_compare_report(
     _write_jsonl(p_cost_trace_jsonl, cost_trace_rows)
     _write_jsonl(p_posterior_trace_jsonl, posterior_trace_rows)
     _write_jsonl(p_posterior_checkpoint_jsonl, posterior_checkpoint_trace_rows)
+    if trace_mode == "full" and len(ev_meta_rows) > 0:
+        _write_csv(p_ev_meta_csv, ev_meta_rows)
+        _write_csv(p_slot_sessions_csv, slot_session_rows)
     _write_csv(
         p_blocked_csv,
         blocked_rows,
@@ -2840,6 +3368,9 @@ def run_algorithm_compare_report(
         "physical_model_manifest_json": _to_rel_plot(physical_manifest_path, plots_base),
         "git_revision_txt": _to_rel_plot(git_rev_path, plots_base),
     }
+    if trace_mode == "full" and len(ev_meta_rows) > 0:
+        plot_paths["ev_meta_csv"] = _to_rel_plot(p_ev_meta_csv, plots_base)
+        plot_paths["slot_sessions_csv"] = _to_rel_plot(p_slot_sessions_csv, plots_base)
     if bool(wrote_event_parquet):
         plot_paths["event_trace_parquet"] = _to_rel_plot(p_event_trace_parquet, plots_base)
     if bool(wrote_cost_parquet):
@@ -2873,7 +3404,9 @@ def run_algorithm_compare_report(
         "candidate_margin_values_s": [int(x) for x in candidate_margin_values_s],
         "algorithm_ids": [s.id for s in selected_algo_specs],
         "ev_counts": [int(x) for x in ev_counts],
-        "evse_fixed": int(FIXED_EVSE_COUNT),
+        "evse_fixed": int(evse_count),
+        "evse_count": int(evse_count),
+        "simultaneous_arrivals": bool(simultaneous_arrivals),
         "algorithms": [
             {
                 "id": s.id,
@@ -2906,11 +3439,11 @@ def run_algorithm_compare_report(
             "min_shared_points": int(algo.MIN_SHARED_POINTS),
             "switch_penalty": float(algo.SWITCH_PENALTY),
             "candidate_time_margin_s": int(main_candidate_margin_s),
-            "ev_sensor_extra_delay_max_s": int(getattr(algo, "EV_SENSOR_EXTRA_DELAY_MAX_S", 0)),
-            "ev_sensor_gain_std": float(getattr(algo, "EV_SENSOR_GAIN_STD", 0.0)),
-            "ev_sensor_bias_std_a": float(getattr(algo, "EV_SENSOR_BIAS_STD_A", 0.0)),
-            "ev_sensor_noise_std_a": float(getattr(algo, "EV_SENSOR_NOISE_STD_A", 0.0)),
-            "ev_start_est_jitter_s": int(getattr(algo, "EV_START_EST_JITTER_S", 0)),
+            "ev_sensor_extra_delay_max_s": int(sensor_cfg["ev_sensor_extra_delay_max_s"]),
+            "ev_sensor_gain_std": float(sensor_cfg["ev_sensor_gain_std"]),
+            "ev_sensor_bias_std_a": float(sensor_cfg["ev_sensor_bias_std_a"]),
+            "ev_sensor_noise_std_a": float(sensor_cfg["ev_sensor_noise_std_a"]),
+            "ev_start_est_jitter_s": int(sensor_cfg["ev_start_est_jitter_s"]),
             "refined_cost_weights": {
                 "dtw": float(getattr(algo, "REFINED_DTW_WEIGHT", 1.0)),
                 "step_signature": float(getattr(algo, "REFINED_STEP_WEIGHT", 0.40)),
@@ -2918,10 +3451,10 @@ def run_algorithm_compare_report(
             },
             "bayesian_params": {
                 "time_prior_alpha": float(getattr(algo, "TIME_PRIOR_ALPHA", 1.0)),
-                "current_like_beta": float(getattr(algo, "CURRENT_LIKE_BETA", 1.0)),
+                "current_like_beta": float(a3_cfg["a3_current_like_beta"]),
                 "posterior_eps": float(getattr(algo, "POSTERIOR_EPS", 1e-9)),
-                "time_prior_mix": float(getattr(algo, "TIME_PRIOR_MIX", 0.35)),
-                "posterior_prev_power": float(getattr(algo, "POSTERIOR_PREV_POWER", 0.60)),
+                "time_prior_mix": float(a3_cfg["a3_time_prior_mix"]),
+                "posterior_prev_power": float(a3_cfg["a3_posterior_prev_power"]),
                 "current_cost_weight": float(getattr(algo, "CURRENT_COST_WEIGHT", 0.15)),
             },
             "assignment_policy": "window-fixed (arrival+window) global 1:1 on matured windows, finalization at window watermark",

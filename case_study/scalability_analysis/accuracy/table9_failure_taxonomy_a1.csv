@@ -1,0 +1,13 @@
+breakdown,bin,sessions,errors,error_rate,share_of_errors
+candidate_set_size,≤ 10,110,0,0.0,0.0
+candidate_set_size,11–25,2795,53,0.018962432915921288,0.19776119402985073
+candidate_set_size,26–40,6995,209,0.029878484631879913,0.7798507462686567
+candidate_set_size,> 40,100,6,0.06,0.022388059701492536
+window,t_eff = W,10000,268,0.0268,1.0
+window,t_eff < W (truncated),0,0,,0.0
+steps_observed,6,10000,268,0.0268,1.0
+cause,truncation,0,0,,0.0
+cause,ingestion (late/lost sample before watermark),61,5,0.08196721311475409,0.018656716417910446
+cause,sensing (2σ distortion),3411,110,0.03224860744649663,0.41044776119402987
+cause,step-signature overlap (remainder),10000,153,0.0153,0.5708955223880597
+all,all sessions,10000,268,0.0268,1.0

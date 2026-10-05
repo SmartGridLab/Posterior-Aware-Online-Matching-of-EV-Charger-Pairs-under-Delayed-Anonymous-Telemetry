@@ -31,6 +31,9 @@ MCCT_TAU_SECONDS = 60
 MCCT_STEPS_AFTER_ZERO = 5
 MCCT_TOTAL_STEPS = 1 + MCCT_STEPS_AFTER_ZERO
 MCCT_WINDOW_SECONDS = MCCT_TAU_SECONDS * MCCT_TOTAL_STEPS
+# Upper bound on simulated EVSE slots. Raised from 200 to 300 for the
+# static-limit sanity check (300 simultaneous sessions, one slot each).
+MAX_EVSE_COUNT = 300
 _DEFAULT_INGESTION = default_ingestion_values()
 
 
@@ -59,8 +62,8 @@ class SimulationParameters:
             raise ValueError("EVSE count must be positive")
         if self.ev_count > 2000:
             raise ValueError("EV count is too large (max 2000)")
-        if self.evse_count > 200:
-            raise ValueError("EVSE count is too large (max 200)")
+        if self.evse_count > MAX_EVSE_COUNT:
+            raise ValueError(f"EVSE count is too large (max {MAX_EVSE_COUNT})")
         if self.sim_hours <= 0:
             raise ValueError("Simulation hours must be positive")
         if self.session_min_minutes <= 0 or self.session_max_minutes <= 0:

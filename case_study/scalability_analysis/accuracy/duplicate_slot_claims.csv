@@ -1,0 +1,5 @@
+algorithm_id,decisions,errors,duplicate_pairs,later_decisions,pairs_one_misidentified,pairs_both_misidentified,same_batch_pairs,misidentified_sessions_involved
+bayesian_windowed,10000,162,198,195,194,4,0,159
+nomura_original_interval_hungarian,10000,7,8,8,8,0,0,7
+single_only,10000,268,326,316,316,10,0,256
+time_only_baseline,10000,2879,2157,1982,1816,341,0,1979

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Build the Figure 6 data table from the committed ablation reproduction run.
+"""Build the figure6 data table (manuscript Figure 8) from the committed ablation reproduction runs.
 
 Aggregates the per-run results (``raw_runs.csv``) of the Section VI-C ablation
 run (produced by ``python scripts/reproduce_all.py --mode ablation`` on the
-canonical base-load scenario seeds) into the plotting table consumed by
+canonical base-load scenario seeds) and of the two-prefix baseline run
+(``--mode ablation --algorithms two_prefix_greedy,two_prefix_hungarian``, same
+seeds; two-prefix baseline) into the plotting table consumed by
 ``generate_figure6_ablation_summary()``:
 
     case_study/scalability_analysis/accuracy/figure6_ablation_simulated.csv
@@ -13,20 +15,23 @@ manuscript: EV in {100, 500} average repeats 1-20, while EV = 300 averages the
 held-out evaluation repeats 6-20 (repeats 1-5 are the hyperparameter
 calibration slice and are excluded from every reported number).
 
-Two integrity gates run before anything is written:
+Three integrity gates run before anything is written:
 
 * every (variant, EV) cell must aggregate exactly the protocol repeat count
-  (20 at EV in {100, 500}; 15 held-out repeats at EV = 300), and
+  (20 at EV in {100, 500}; 15 held-out repeats at EV = 300),
 * the three full-design rows (A1/A2/A3) must equal the canonical run's
   ``raw_runs.csv`` aggregated under the same protocol exactly, which proves
-  that the ablation run replayed the identical scenario realizations.
+  that the ablation run replayed the identical scenario realizations, and
+* every (EV, repeat) scenario of the two-prefix run carries the same
+  ``scenario_hash`` as the committed ablation run, so the two-prefix rows are
+  paired with every existing series of the figure.
 
 Coinciding curves in the Posterior panel (the time-prior-removed variant stays
 within the repeat confidence interval of the full design, and all-removed ~=
 without-carry-over within 0.1 pt) are separated by a small horizontal marker
 offset (``dodge`` column, in EV-session units): lines are drawn at the true x
 positions, only the markers are displaced, and the offset is declared in the
-Figure 6 caption.
+Figure 8 caption.
 """
 
 from __future__ import annotations
@@ -39,9 +44,12 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACCURACY_DIR = REPO_ROOT / "case_study" / "scalability_analysis" / "accuracy"
-ABLATION_RUN_ID = "20260711_164832_170489"
+ABLATION_RUN_ID = "20260909_112655_937821"
+# Two-prefix baselines run on the same base-load scenario seeds.
+TWO_PREFIX_RUN_ID = "20260908_170955_253026"
 ABLATION_RAW = ACCURACY_DIR / f"ablation_run_{ABLATION_RUN_ID}" / "raw_runs.csv"
-CANONICAL_RAW = ACCURACY_DIR / "canonical_run_20260626_170431_105970" / "raw_runs.csv"
+TWO_PREFIX_RAW = ACCURACY_DIR / f"ablation_two_prefix_run_{TWO_PREFIX_RUN_ID}" / "raw_runs.csv"
+CANONICAL_RAW = ACCURACY_DIR / "canonical_run_20260907_111056_515561" / "raw_runs.csv"
 OUT_CSV = ACCURACY_DIR / "figure6_ablation_simulated.csv"
 
 EV_COUNTS = (100, 300, 500)
@@ -57,6 +65,10 @@ SERIES: list[tuple[str, str, str, str, str, float, str]] = [
     ("single_only_step_off", "Greedy", "without step-signature", "s", "-.", 0.0, "open"),
     ("single_only_dtw_off", "Greedy", "without DTW", "^", "--", 0.0, "open"),
     ("single_only_all_off", "Greedy", "all terms removed", "D", ":", 0.0, "open"),
+    # the two two-prefix baselines coincide exactly (same per-repeat accuracies), so their
+    # markers are dodged like the coinciding Posterior-panel variants (declared in the caption)
+    ("two_prefix_greedy", "Greedy", "two-prefix greedy", "v", "--", -9.0, "open"),
+    ("two_prefix_hungarian", "Greedy", "two-prefix Hungarian", "P", "-.", 9.0, "open"),
     ("nomura_original_interval_hungarian", "Global", "Global (full)", "o", "-", 0.0, "filled"),
     ("nomura_original_interval_hungarian_corr_off", "Global", "without correlation", "s", "-.", 0.0, "open"),
     ("nomura_original_interval_hungarian_dtw_off", "Global", "without DTW", "^", "--", 0.0, "open"),
@@ -85,10 +97,26 @@ def _protocol_cell(raw: pd.DataFrame, algorithm_id: str, ev_count: int) -> tuple
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ablation-raw", type=Path, default=ABLATION_RAW)
+    parser.add_argument("--two-prefix-raw", type=Path, default=TWO_PREFIX_RAW)
     args = parser.parse_args()
 
-    ablation = pd.read_csv(args.ablation_raw)
+    ablation_only = pd.read_csv(args.ablation_raw)
+    two_prefix = pd.read_csv(args.two_prefix_raw)
     canonical = pd.read_csv(CANONICAL_RAW)
+
+    # Gate 3: the two-prefix run must replay the committed ablation scenarios exactly
+    # (same scenario_hash for every (EV, repeat)), so its rows pair with every series.
+    ref_hash = (
+        ablation_only[ablation_only["algorithm_id"] == "single_only"]
+        .set_index(["ev_count", "repeat_idx"])["scenario_hash"]
+    )
+    for (ev_count, repeat_idx), grp in two_prefix.groupby(["ev_count", "repeat_idx"]):
+        hashes = set(grp["scenario_hash"])
+        if len(hashes) != 1 or hashes != {ref_hash.loc[(int(ev_count), int(repeat_idx))]}:
+            raise AssertionError(
+                f"two-prefix run EV={ev_count} repeat={repeat_idx}: scenario_hash differs from the committed ablation run"
+            )
+    ablation = pd.concat([ablation_only, two_prefix], ignore_index=True)
 
     # Gate 1: protocol repeat counts for every plotted cell.
     for algorithm_id, *_rest in SERIES:

@@ -1,0 +1,25 @@
+model,algorithm_id,ev_count,runs,accuracy_mean,accuracy_ci95,delta_vs_nominal_mean,delta_vs_nominal_ci95,run_id
+nominal,time_only_baseline,100,20,0.9165,0.015205,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,time_only_baseline,100,20,0.917,0.014963,0.0005,0.003212,20260908_170955_253072
+nominal,time_only_baseline,300,15,0.802889,0.011858,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,time_only_baseline,300,15,0.803111,0.012194,0.000222,0.001906,20260908_170955_253072
+nominal,time_only_baseline,500,20,0.7121,0.011634,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,time_only_baseline,500,20,0.7133,0.011577,0.0012,0.001977,20260908_170955_253072
+nominal,single_only,100,20,0.996,0.002352,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,single_only,100,20,0.9915,0.004096,-0.0045,0.003553,20260908_170955_253072
+nominal,single_only,300,15,0.989111,0.003156,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,single_only,300,15,0.97,0.004983,-0.019111,0.005425,20260908_170955_253072
+nominal,single_only,500,20,0.9732,0.003494,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,single_only,500,20,0.9493,0.005147,-0.0239,0.003738,20260908_170955_253072
+nominal,nomura_original_interval_hungarian,100,20,1.0,0.0,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,nomura_original_interval_hungarian,100,20,0.999,0.001441,-0.001,0.001441,20260908_170955_253072
+nominal,nomura_original_interval_hungarian,300,15,0.998889,0.000901,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,nomura_original_interval_hungarian,300,15,0.999556,0.00065,0.000667,0.000764,20260908_170955_253072
+nominal,nomura_original_interval_hungarian,500,20,0.9993,0.000458,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,nomura_original_interval_hungarian,500,20,0.9991,0.000478,-0.0002,0.0006,20260908_170955_253072
+nominal,bayesian_windowed,100,20,0.9975,0.002079,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,bayesian_windowed,100,20,0.995,0.003221,-0.0025,0.003981,20260908_170955_253072
+nominal,bayesian_windowed,300,15,0.990667,0.002437,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,bayesian_windowed,300,15,0.979333,0.005089,-0.011333,0.004973,20260908_170955_253072
+nominal,bayesian_windowed,500,20,0.9838,0.003241,0.0,0.0,20260907_111056_515561 (canonical)
+heterogeneous,bayesian_windowed,500,20,0.965,0.003676,-0.0188,0.002757,20260908_170955_253072

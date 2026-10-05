@@ -20,7 +20,7 @@ paper/*.fls
 paper/*.log
 paper/*.out
 paper/*.synctex.gz
-paper/Posterior-Aware_Online_Matching_of_EV-Charger_Pairs_under_Delayed_Anonymous_Telemetry_source.pdf
+paper/Watermark-Based_Online_EV-Charger_Matching_from_Delayed_Slot-Unlabeled_Telemetry_source.pdf
 paper/*_baseline.tex
 paper/*_backup.pdf
 paper/*_preresize_backup.pdf
@@ -34,6 +34,6 @@ diagnostic_signal_realism_overlay.pdf
 diagnostic_signal_realism_overlay.png
 
 # New experiment outputs are generated locally by default.
-# Canonical submitted data is kept under case_study/scalability_analysis/accuracy/.
+# Canonical result data is kept under case_study/scalability_analysis/accuracy/.
 .generated/
 plots/

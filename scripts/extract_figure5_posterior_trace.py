@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Extract the Figure 5 posterior-evolution trace from a canonical single-scenario replay.
+"""Extract the posterior-evolution trace of figure file figure5 (Supplementary Fig. S1) from a canonical single-scenario replay.
 
-Figure 5 shows the two-stage posterior evolution of one representative session
+Supplementary Fig. S1 shows the two-stage posterior evolution of one representative session
 at the representative operating point (EV=500, candidate_margin=120 s, matcher_delay_max=10 s,
 ev_sample=30 s, tau=60 s). Six diagnostic indices correspond to three renormalized-posterior
 checkpoints inside each of the two update stages of a single watermark decision:
@@ -15,7 +15,7 @@ This driver replays exactly the canonical rep=0 scenario for that operating poin
 canonical grid assigns seed = base_seed + scenario_counter in nested-loop order; the
 representative operating point (rep=0) has scenario_counter=1360, i.e. seed=2187632432.
 Running the single operating point with base_seed set to that value reproduces the identical
-dataset, ingestion realization and A3 decision path (canonical A3 accuracy = 0.968 for this
+dataset, ingestion realization and A3 decision path (canonical A3 accuracy = 0.982 for this
 scenario), so the extracted checkpoints are the real posteriors of the paper's example.
 
 The featured session is selected deterministically: among the sessions whose final
@@ -74,7 +74,7 @@ def _run_replay() -> Path:
     # Sanity: A3 accuracy of this single scenario must match the canonical raw row.
     raw = pd.read_csv(out_dir / "raw_runs.csv")
     acc = float(raw.loc[raw["algorithm_id"] == "bayesian_windowed", "accuracy"].iloc[0])
-    print(f"[extract] replayed A3 accuracy={acc:.4f} (canonical raw = 0.968 for seed {REP_SEED})")
+    print(f"[extract] replayed A3 accuracy={acc:.4f} (canonical raw = 0.982 for seed {REP_SEED})")
     return out_dir
 
 
